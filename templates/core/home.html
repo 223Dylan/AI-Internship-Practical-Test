@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vunoh Assistant</title>
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="header">
+        <h1>Vunoh Assistant</h1>
+        <p class="subhead">
+          Describe what you need in plain English. We’ll extract intent, assess risk, and create a task you can track.
+        </p>
+      </header>
+
+      <section class="card">
+        <form method="post" action="#">
+          {% csrf_token %}
+          <label class="label" for="request_text">Your request</label>
+          <textarea
+            id="request_text"
+            name="request_text"
+            class="textarea"
+            rows="5"
+            placeholder="e.g. I need to send KES 15,000 to my mother in Kisumu urgently."
+            required
+          ></textarea>
+
+          <div class="row">
+            <button type="submit" class="button" disabled>Submit (Step 1)</button>
+            <span class="hint">Step 1 only: UI scaffold. Submission wiring comes next.</span>
+          </div>
+        </form>
+      </section>
+
+      <section class="examples">
+        <h2>Examples</h2>
+        <ul>
+          <li>I need to send KES 15,000 to my mother in Kisumu urgently.</li>
+          <li>Please verify my land title deed for the plot in Karen.</li>
+          <li>Can someone clean my apartment in Westlands on Friday?</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
+

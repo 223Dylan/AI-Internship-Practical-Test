@@ -1,0 +1,117 @@
+:root {
+  --bg: #0b1220;
+  --card: rgba(255, 255, 255, 0.06);
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.72);
+  --border: rgba(255, 255, 255, 0.12);
+  --accent: #6ee7ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
+  color: var(--text);
+  background: radial-gradient(1200px 600px at 10% 0%, rgba(110, 231, 255, 0.12), transparent 60%),
+    radial-gradient(900px 500px at 90% 10%, rgba(147, 197, 253, 0.10), transparent 55%),
+    var(--bg);
+}
+
+.container {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 48px 20px 64px;
+}
+
+.header h1 {
+  margin: 0 0 10px;
+  font-size: 34px;
+  letter-spacing: -0.02em;
+}
+
+.subhead {
+  margin: 0 0 22px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.card {
+  padding: 18px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+}
+
+.label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.textarea {
+  width: 100%;
+  padding: 12px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--text);
+  line-height: 1.4;
+  resize: vertical;
+  outline: none;
+}
+
+.textarea:focus {
+  border-color: rgba(110, 231, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(110, 231, 255, 0.12);
+}
+
+.row {
+  margin-top: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.button {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(110, 231, 255, 0.35);
+  background: rgba(110, 231, 255, 0.10);
+  color: var(--text);
+  font-weight: 700;
+  cursor: not-allowed;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.examples {
+  margin-top: 18px;
+  padding: 14px 18px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  color: var(--muted);
+}
+
+.examples h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.82);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.examples ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
