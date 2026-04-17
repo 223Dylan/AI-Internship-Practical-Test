@@ -31,8 +31,31 @@ Run migrations and start the server:
 
 Open the app at `http://127.0.0.1:8000/`.
 
+## Intent extraction API (Step 3)
+- Endpoint: `POST /api/extract-intent/`
+- Request body:
+
+```json
+{ "request_text": "I need to send KES 15000 to my mother in Kisumu urgently." }
+```
+
+- Example PowerShell call:
+
+```bash
+Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:8000/api/extract-intent/ `
+  -ContentType "application/json" `
+  -Body '{"request_text":"Please verify my land title deed for Karen"}'
+```
+
+- Provider behavior:
+  - `AI_PROVIDER=gemini` + `AI_API_KEY=<key>` uses Gemini extraction
+  - otherwise falls back to deterministic mock extraction to keep the app testable offline
+
 ## Project status
 - Step 1 complete: runnable skeleton + homepage UI scaffold.
+- Step 2 complete: persistence schema + admin visibility for tasks and related objects.
+- Step 3 in progress: structured intent/entities extraction endpoint + UI output panel.
 
 ## Decisions I made and why (to be completed)
 - Which AI tools I used and where

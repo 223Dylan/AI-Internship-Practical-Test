@@ -16,8 +16,7 @@
       </header>
 
       <section class="card">
-        <form method="post" action="#">
-          {% csrf_token %}
+        <form id="intent-form">
           <label class="label" for="request_text">Your request</label>
           <textarea
             id="request_text"
@@ -29,10 +28,15 @@
           ></textarea>
 
           <div class="row">
-            <button type="submit" class="button" disabled>Submit (Step 1)</button>
-            <span class="hint">Step 1 only: UI scaffold. Submission wiring comes next.</span>
+            <button type="submit" class="button">Extract Intent</button>
+            <span class="hint">Step 3: structured intent + entities extraction</span>
           </div>
         </form>
+      </section>
+
+      <section class="card output-card">
+        <h2 class="result-title">Extraction output</h2>
+        <pre id="result" class="result-box">Submit a request to see structured JSON output.</pre>
       </section>
 
       <section class="examples">
@@ -44,6 +48,34 @@
         </ul>
       </section>
     </main>
+    <script>
+      const form = document.getElementById("intent-form");
+      const resultBox = document.getElementById("result");
+      const requestInput = document.getElementById("request_text");
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const requestText = requestInput.value.trim();
+        if (!requestText) {
+          resultBox.textContent = "Please enter a request first.";
+          return;
+        }
+
+        resultBox.textContent = "Extracting intent...";
+        try {
+          const response = await fetch("/api/extract-intent/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ request_text: requestText }),
+          });
+          const data = await response.json();
+          resultBox.textContent = JSON.stringify(data, null, 2);
+        } catch (error) {
+          resultBox.textContent = `Request failed: ${error}`;
+        }
+      });
+    </script>
   </body>
 </html>
 

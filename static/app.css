@@ -86,7 +86,7 @@ body {
   background: rgba(110, 231, 255, 0.10);
   color: var(--text);
   font-weight: 700;
-  cursor: not-allowed;
+  cursor: pointer;
 }
 
 .hint {
@@ -113,5 +113,28 @@ body {
 .examples ul {
   margin: 0;
   padding-left: 18px;
+}
+
+.output-card {
+  margin-top: 16px;
+}
+
+.result-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.result-box {
+  margin: 0;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: #c7f9ff;
+  min-height: 130px;
+  overflow: auto;
 }
 
