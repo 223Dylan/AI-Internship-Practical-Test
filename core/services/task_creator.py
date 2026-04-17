@@ -7,18 +7,18 @@ from typing import Any
 
 from django.db import transaction
 
-from core.models import Task, TaskEntity, TaskStatus, TaskStatusHistory
+from core.models import (
+    MessageChannel,
+    Task,
+    TaskEntity,
+    TaskMessage,
+    TaskStatus,
+    TaskStatusHistory,
+    TaskStep,
+)
+from core.services.employee_assigner import assign_employee_team
 from core.services.intent_extractor import extract_intent_and_entities
 from core.services.risk_scorer import assess_risk
-
-
-INTENT_TEAM_MAP = {
-    "send_money": "FINANCE",
-    "get_airport_transfer": "OPERATIONS",
-    "hire_service": "OPERATIONS",
-    "verify_document": "LEGAL",
-    "check_status": "SUPPORT",
-}
 
 
 @dataclass(frozen=True)
@@ -26,11 +26,13 @@ class TaskCreationResult:
     task: Task
     extraction_provider: str
     fallback_used: bool
+    assignment_reason: str
 
 
 def create_task_from_request(customer_text: str) -> TaskCreationResult:
     extraction = extract_intent_and_entities(customer_text)
     risk = assess_risk(extraction.intent, extraction.entities)
+    assignment = assign_employee_team(extraction.intent, extraction.entities)
 
     with transaction.atomic():
         task = Task.objects.create(
@@ -40,11 +42,13 @@ def create_task_from_request(customer_text: str) -> TaskCreationResult:
             entities=extraction.entities,
             risk_score=risk.score,
             risk_reasons=risk.reasons,
-            assigned_team=INTENT_TEAM_MAP.get(extraction.intent, "SUPPORT"),
+            assigned_team=assignment.team,
             status=TaskStatus.PENDING,
         )
 
         _persist_entity_items(task, extraction.entities)
+        _persist_steps(task, extraction.intent, extraction.entities)
+        _persist_messages(task)
         TaskStatusHistory.objects.create(
             task=task,
             from_status=TaskStatus.PENDING,
@@ -55,6 +59,7 @@ def create_task_from_request(customer_text: str) -> TaskCreationResult:
         task=task,
         extraction_provider=extraction.provider,
         fallback_used=extraction.fallback_used,
+        assignment_reason=assignment.reason,
     )
 
 
@@ -68,6 +73,97 @@ def _normalize_value(value: Any) -> str:
     if isinstance(value, (list, dict)):
         return str(value)
     return "" if value is None else str(value)
+
+
+def _persist_steps(task: Task, intent: str, entities: dict[str, Any]) -> None:
+    steps = _generate_steps(intent, entities)
+    for index, description in enumerate(steps, start=1):
+        TaskStep.objects.create(task=task, step_order=index, description=description)
+
+
+def _persist_messages(task: Task) -> None:
+    messages = _generate_messages(task)
+    for channel, content in messages.items():
+        TaskMessage.objects.create(task=task, channel=channel, content=content)
+
+
+def _generate_steps(intent: str, entities: dict[str, Any]) -> list[str]:
+    location = str(entities.get("location") or entities.get("destination") or "Nairobi")
+    service = str(entities.get("service_type") or "requested service")
+    document = str(entities.get("document_type") or entities.get("document") or "document")
+    recipient = str(entities.get("recipient") or "recipient")
+
+    if intent == "send_money":
+        return [
+            "Confirm sender identity and transaction authorization.",
+            f"Verify recipient details for {recipient}.",
+            "Run fraud checks and compliance screening.",
+            "Initiate transfer and capture confirmation reference.",
+            "Notify customer after transfer confirmation.",
+        ]
+    if intent == "verify_document":
+        return [
+            f"Collect and validate submitted {document} details.",
+            "Run records verification with relevant authorities.",
+            "Escalate suspicious mismatches to Legal review.",
+            "Prepare verification result and supporting notes.",
+            "Share verification outcome with customer.",
+        ]
+    if intent == "hire_service":
+        return [
+            f"Confirm service scope for {service}.",
+            f"Match and shortlist providers near {location}.",
+            "Confirm schedule and service fee with customer.",
+            "Dispatch provider and monitor completion evidence.",
+            "Close task after customer sign-off.",
+        ]
+    if intent == "get_airport_transfer":
+        return [
+            "Collect arrival details and passenger contacts.",
+            f"Assign verified driver and vehicle for {location}.",
+            "Share pickup instructions with customer.",
+            "Track arrival and pickup completion status.",
+            "Confirm successful drop-off and close task.",
+        ]
+    return [
+        "Retrieve task details by code and current workflow status.",
+        "Confirm latest update from assigned operations team.",
+        "Prepare concise progress summary for customer.",
+        "Share next expected action and timeline.",
+    ]
+
+
+def _generate_messages(task: Task) -> dict[str, str]:
+    whatsapp = (
+        f"Hi! Your request is received and now in {task.status.replace('_', ' ').title()}.\n"
+        f"Task code: {task.code}\n"
+        f"Team: {task.assigned_team.title()}\n"
+        "We'll keep you updated at each milestone."
+    )
+    email = (
+        "Subject: Vunoh Task Confirmation\n\n"
+        f"Dear Customer,\n\nYour request has been logged successfully.\n"
+        f"Task Code: {task.code}\n"
+        f"Intent: {task.intent}\n"
+        f"Current Status: {task.status.replace('_', ' ').title()}\n"
+        f"Assigned Team: {task.assigned_team.title()}\n"
+        f"Risk Score: {task.risk_score}\n\n"
+        "We will notify you as your task progresses.\n\nRegards,\nVunoh Global"
+    )
+    sms = _truncate_sms(
+        f"Vunoh: Task {task.code} is {task.status.replace('_', ' ').title()}."
+        f" Team {task.assigned_team.title()}. Reply with code for updates."
+    )
+
+    return {
+        MessageChannel.WHATSAPP: whatsapp,
+        MessageChannel.EMAIL: email,
+        MessageChannel.SMS: sms,
+    }
+
+
+def _truncate_sms(message: str) -> str:
+    return message if len(message) <= 160 else message[:157] + "..."
 
 
 def _generate_task_code() -> str:

@@ -2,7 +2,8 @@ import json
 
 from django.test import Client, TestCase
 
-from core.models import Task, TaskEntity, TaskStatusHistory
+from core.models import MessageChannel, Task, TaskEntity, TaskMessage, TaskStatusHistory, TaskStep
+from core.services.employee_assigner import assign_employee_team
 from core.services.intent_extractor import extract_intent_and_entities
 from core.services.risk_scorer import assess_risk
 
@@ -67,7 +68,13 @@ class IntentExtractionApiTests(TestCase):
         self.assertEqual(task.intent, "send_money")
         self.assertEqual(task.status, "PENDING")
         self.assertTrue(TaskEntity.objects.filter(task=task).exists())
+        self.assertTrue(TaskStep.objects.filter(task=task).exists())
+        self.assertTrue(TaskMessage.objects.filter(task=task).exists())
         self.assertTrue(TaskStatusHistory.objects.filter(task=task).exists())
+        self.assertIn("steps", payload)
+        self.assertIn("messages", payload)
+        self.assertEqual(task.assigned_team, "FINANCE")
+        self.assertIn("assignment_reason", payload)
 
     def test_create_task_api_generates_unique_codes(self):
         req_body = json.dumps({"request_text": "Please verify my land title deed for Karen."})
@@ -95,6 +102,25 @@ class IntentExtractionApiTests(TestCase):
         response = self.client.get("/api/tasks/?limit=bad")
         self.assertEqual(response.status_code, 400)
 
+    def test_create_task_api_persists_three_message_formats(self):
+        response = self.client.post(
+            "/api/tasks/create/",
+            data=json.dumps({"request_text": "Please verify my land title deed for Karen."}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201)
+        task = Task.objects.get(code=response.json()["task_code"])
+
+        channels = set(TaskMessage.objects.filter(task=task).values_list("channel", flat=True))
+        self.assertEqual(
+            channels,
+            {MessageChannel.WHATSAPP, MessageChannel.EMAIL, MessageChannel.SMS},
+        )
+
+        sms_message = TaskMessage.objects.get(task=task, channel=MessageChannel.SMS)
+        self.assertLessEqual(len(sms_message.content), 160)
+        self.assertEqual(task.assigned_team, "LEGAL")
+
 
 class RiskScorerTests(TestCase):
     def test_high_risk_money_transfer_scenario(self):
@@ -120,3 +146,17 @@ class RiskScorerTests(TestCase):
         )
         self.assertGreaterEqual(result.score, 0)
         self.assertLessEqual(result.score, 30)
+
+
+class EmployeeAssignerTests(TestCase):
+    def test_assign_send_money_to_finance(self):
+        result = assign_employee_team("send_money", {"amount": "20000"})
+        self.assertEqual(result.team, "FINANCE")
+
+    def test_assign_verify_document_to_legal(self):
+        result = assign_employee_team("verify_document", {"document_type": "land title"})
+        self.assertEqual(result.team, "LEGAL")
+
+    def test_assign_hire_service_to_operations(self):
+        result = assign_employee_team("hire_service", {"service_type": "cleaning"})
+        self.assertEqual(result.team, "OPERATIONS")

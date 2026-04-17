@@ -73,12 +73,34 @@ Invoke-RestMethod -Method Post `
 - List endpoint: `GET /api/tasks/?limit=20`
   - returns recent tasks with code, intent, status, risk, assignment, and created time
 
+## Step + message generation (Step 6)
+- `POST /api/tasks/create/` now also:
+  - generates intent-specific fulfillment steps and stores them in `TaskStep`
+  - generates and stores channel-specific messages in `TaskMessage`
+    - WhatsApp style
+    - Email style
+    - SMS style (<=160 chars)
+- The create response now includes `steps` and `messages` arrays for immediate validation.
+
+## Employee assignment (Step 7)
+- Team assignment is now handled by dedicated routing logic in `employee_assigner`.
+- Assignment uses intent and context hints to map tasks to:
+  - `FINANCE` for money transfer
+  - `OPERATIONS` for service/airport execution
+  - `LEGAL` for document verification
+  - `SUPPORT` for status follow-up/default routing
+- `POST /api/tasks/create/` includes:
+  - `assigned_team`
+  - `assignment_reason`
+
 ## Project status
 - Step 1 complete: runnable skeleton + homepage UI scaffold.
 - Step 2 complete: persistence schema + admin visibility for tasks and related objects.
 - Step 3 complete: structured intent/entities extraction endpoint + UI output panel.
 - Step 4 complete: deterministic diaspora-aware risk scoring engine and API output.
-- Step 5 in progress: task creation pipeline + API dashboard listing.
+- Step 5 complete: task creation pipeline + API dashboard listing.
+- Step 6 complete: step generation + three-format message persistence.
+- Step 7 in progress: explicit employee assignment routing and rationale exposure.
 
 ## Decisions I made and why (to be completed)
 - Which AI tools I used and where

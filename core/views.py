@@ -75,6 +75,8 @@ def create_task(request):
         return JsonResponse({"error": "Task creation failed."}, status=502)
 
     task = creation.task
+    steps = list(task.steps.values("step_order", "description"))
+    messages = list(task.messages.values("channel", "content"))
     return JsonResponse(
         {
             "task_code": task.code,
@@ -84,7 +86,10 @@ def create_task(request):
             "risk_score": task.risk_score,
             "risk_reasons": task.risk_reasons,
             "assigned_team": task.assigned_team,
+            "assignment_reason": creation.assignment_reason,
             "created_at": task.created_at.isoformat(),
+            "steps": steps,
+            "messages": messages,
             "provider": creation.extraction_provider,
             "fallback_used": creation.fallback_used,
         },
