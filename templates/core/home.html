@@ -28,15 +28,23 @@
           ></textarea>
 
           <div class="row">
-            <button type="submit" class="button">Extract Intent</button>
-            <span class="hint">Step 3: structured intent + entities extraction</span>
+            <button type="submit" class="button">Create Task</button>
+            <span class="hint">Step 5: creates a persisted task with unique code</span>
           </div>
         </form>
       </section>
 
       <section class="card output-card">
-        <h2 class="result-title">Extraction output</h2>
-        <pre id="result" class="result-box">Submit a request to see structured JSON output.</pre>
+        <h2 class="result-title">Task creation output</h2>
+        <pre id="result" class="result-box">Submit a request to create and persist a task.</pre>
+      </section>
+
+      <section class="card output-card">
+        <div class="dashboard-header">
+          <h2 class="result-title">Saved tasks dashboard</h2>
+          <button id="refresh-tasks" type="button" class="button secondary">Refresh</button>
+        </div>
+        <pre id="tasks-result" class="result-box">No tasks loaded yet.</pre>
       </section>
 
       <section class="examples">
@@ -51,7 +59,22 @@
     <script>
       const form = document.getElementById("intent-form");
       const resultBox = document.getElementById("result");
+      const tasksResult = document.getElementById("tasks-result");
+      const refreshButton = document.getElementById("refresh-tasks");
       const requestInput = document.getElementById("request_text");
+
+      async function loadTasks() {
+        tasksResult.textContent = "Loading tasks...";
+        try {
+          const response = await fetch("/api/tasks/?limit=20", {
+            method: "GET",
+          });
+          const data = await response.json();
+          tasksResult.textContent = JSON.stringify(data, null, 2);
+        } catch (error) {
+          tasksResult.textContent = `Task load failed: ${error}`;
+        }
+      }
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -62,19 +85,26 @@
           return;
         }
 
-        resultBox.textContent = "Extracting intent...";
+        resultBox.textContent = "Creating task...";
         try {
-          const response = await fetch("/api/extract-intent/", {
+          const response = await fetch("/api/tasks/create/", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ request_text: requestText }),
           });
           const data = await response.json();
           resultBox.textContent = JSON.stringify(data, null, 2);
+          await loadTasks();
         } catch (error) {
           resultBox.textContent = `Request failed: ${error}`;
         }
       });
+
+      refreshButton.addEventListener("click", async () => {
+        await loadTasks();
+      });
+
+      loadTasks();
     </script>
   </body>
 </html>

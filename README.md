@@ -52,10 +52,33 @@ Invoke-RestMethod -Method Post `
   - `AI_PROVIDER=gemini` + `AI_API_KEY=<key>` uses Gemini extraction
   - otherwise falls back to deterministic mock extraction to keep the app testable offline
 
+## Risk scoring (Step 4)
+- Risk scoring is now computed for each extraction response and returned as:
+  - `risk_score` (0-100)
+  - `risk_reasons` (human-readable explanation list)
+- Current scoring factors include:
+  - intent type risk uplift
+  - amount thresholds
+  - urgency
+  - recipient verification signal
+  - document sensitivity (e.g. land/title)
+  - returning customer with clean history risk reduction
+
+## Task creation + listing APIs (Step 5)
+- Create endpoint: `POST /api/tasks/create/`
+  - runs extraction + risk scoring
+  - creates a persisted task with unique code
+  - stores normalized entity key-value rows
+  - writes initial status history (`PENDING -> PENDING`)
+- List endpoint: `GET /api/tasks/?limit=20`
+  - returns recent tasks with code, intent, status, risk, assignment, and created time
+
 ## Project status
 - Step 1 complete: runnable skeleton + homepage UI scaffold.
 - Step 2 complete: persistence schema + admin visibility for tasks and related objects.
-- Step 3 in progress: structured intent/entities extraction endpoint + UI output panel.
+- Step 3 complete: structured intent/entities extraction endpoint + UI output panel.
+- Step 4 complete: deterministic diaspora-aware risk scoring engine and API output.
+- Step 5 in progress: task creation pipeline + API dashboard listing.
 
 ## Decisions I made and why (to be completed)
 - Which AI tools I used and where

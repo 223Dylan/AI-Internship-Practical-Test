@@ -89,6 +89,13 @@ body {
   cursor: pointer;
 }
 
+.button.secondary {
+  padding: 8px 12px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
 .hint {
   color: var(--muted);
   font-size: 13px;
@@ -117,6 +124,13 @@ body {
 
 .output-card {
   margin-top: 16px;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
 }
 
 .result-title {

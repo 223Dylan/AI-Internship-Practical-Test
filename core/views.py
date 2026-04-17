@@ -5,7 +5,10 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from .models import Task
 from .services.intent_extractor import extract_intent_and_entities
+from .services.risk_scorer import assess_risk
+from .services.task_creator import create_task_from_request
 
 
 def home(request):
@@ -35,11 +38,90 @@ def extract_intent(request):
     except Exception:
         return JsonResponse({"error": "Intent extraction failed."}, status=502)
 
+    risk = assess_risk(result.intent, result.entities)
     return JsonResponse(
         {
             "intent": result.intent,
             "entities": result.entities,
             "provider": result.provider,
             "fallback_used": result.fallback_used,
+            "risk_score": risk.score,
+            "risk_reasons": risk.reasons,
         }
     )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def create_task(request):
+    payload = {}
+    if request.content_type and "application/json" in request.content_type:
+        try:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON payload."}, status=400)
+    else:
+        payload = request.POST.dict()
+
+    customer_text = str(payload.get("request_text", "")).strip()
+    if not customer_text:
+        return JsonResponse({"error": "request_text is required."}, status=400)
+
+    try:
+        creation = create_task_from_request(customer_text)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except Exception:
+        return JsonResponse({"error": "Task creation failed."}, status=502)
+
+    task = creation.task
+    return JsonResponse(
+        {
+            "task_code": task.code,
+            "status": task.status,
+            "intent": task.intent,
+            "entities": task.entities,
+            "risk_score": task.risk_score,
+            "risk_reasons": task.risk_reasons,
+            "assigned_team": task.assigned_team,
+            "created_at": task.created_at.isoformat(),
+            "provider": creation.extraction_provider,
+            "fallback_used": creation.fallback_used,
+        },
+        status=201,
+    )
+
+
+@require_http_methods(["GET"])
+def list_tasks(request):
+    limit_raw = request.GET.get("limit", "25")
+    try:
+        limit = max(1, min(int(limit_raw), 100))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "limit must be an integer."}, status=400)
+
+    tasks = []
+    queryset = (
+        Task.objects.all()
+        .values(
+            "code",
+            "intent",
+            "status",
+            "risk_score",
+            "assigned_team",
+            "created_at",
+        )[:limit]
+    )
+    for row in queryset:
+        tasks.append(
+            {
+                "task_code": row["code"],
+                "intent": row["intent"],
+                "status": row["status"],
+                "risk_score": row["risk_score"],
+                "assigned_team": row["assigned_team"],
+                "created_at": row["created_at"].isoformat(),
+            }
+        )
+
+    return JsonResponse({"count": len(tasks), "tasks": tasks})
