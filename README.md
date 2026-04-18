@@ -2,7 +2,7 @@
 
 This repository is my submission for the **Vunoh Global AI Internship (2026)** practical test. It implements an AI-assisted web app that lets diaspora customers describe a need in plain English, then turns that into a **persisted task**: extracted intent and entities, **rule-based risk score**, **fulfillment steps**, **WhatsApp / email / SMS** drafts, **team assignment**, and a **dashboard** to track and update status.
 
-The brief (problem, stack constraints, features, submission rules, and evaluation rubric) is defined in [`docs/Vunoh_AI_Intern_Practical_Test_Final.pdf`](docs/Vunoh_AI_Intern_Practical_Test_Final.pdf). This README explains how to run the project, how it maps to that brief, and **why** key design choices were made.
+The brief (problem, stack constraints, features, submission rules, and evaluation rubric) is supplied by Vunoh as **confidential applicant material** and is **not committed** in this repository—keep your copy private (for example in a local `docs/` folder that is gitignored). This README explains how to run the project, how it maps to that brief, and **why** key design choices were made.
 
 ---
 
@@ -177,4 +177,4 @@ This section is required by the brief: using AI tools is fine; **not** being abl
 
 ## License / confidentiality
 
-The practical test PDF is marked confidential for applicants. This README describes the submitted implementation only; distribution of the PDF itself should follow Vunoh’s instructions.
+The practical test brief is confidential for applicants. This repository contains only the implementation; do not commit or redistribute Vunoh’s PDF in this repo.
