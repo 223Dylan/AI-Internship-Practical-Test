@@ -24,6 +24,12 @@ def _truncate_sms(text: str, limit: int = 160) -> str:
     return t[: max(0, limit - 1)].rstrip() + "…"
 
 
+def normalize_fulfillment_fields(
+    raw: dict[str, Any],
+) -> Optional[tuple[list[str], dict[str, str]]]:
+    return _normalize_fulfillment(raw)
+
+
 def _normalize_fulfillment(raw: dict[str, Any]) -> Optional[tuple[list[str], dict[str, str]]]:
     steps_raw = raw.get("steps")
     if not isinstance(steps_raw, list):
@@ -56,8 +62,9 @@ def try_llm_fulfillment(
     assigned_team: str,
     risk_score: int,
     customer_text: str,
+    allow_network: bool = True,
 ) -> Optional[tuple[list[str], dict[str, str]]]:
-    if not _llm_fulfillment_enabled():
+    if not allow_network or not _llm_fulfillment_enabled():
         return None
 
     prompt = f"""You are Vunoh's internal task fulfillment assistant.
@@ -89,6 +96,6 @@ Customer request:
         parsed = _parse_llm_json(text)
         if not isinstance(parsed, dict):
             return None
-        return _normalize_fulfillment(parsed)
+        return normalize_fulfillment_fields(parsed)
     except Exception:
         return None

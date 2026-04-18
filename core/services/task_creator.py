@@ -18,6 +18,7 @@ from core.models import (
 )
 from core.services.employee_assigner import assign_employee_team_with_llm_optional
 from core.services.intent_extractor import extract_intent_and_entities
+from core.services.llm_combined_task import combined_task_llm_enabled, try_combined_task_llm
 from core.services.llm_fulfillment import try_llm_fulfillment
 from core.services.risk_scorer import assess_risk
 
@@ -34,10 +35,52 @@ class TaskCreationResult:
 
 def create_task_from_request(customer_text: str) -> TaskCreationResult:
     text = customer_text.strip()
-    extraction = extract_intent_and_entities(text)
+    combined_attempted = False
+
+    if combined_task_llm_enabled():
+        combined_attempted = True
+        code = _generate_task_code()
+        combined = try_combined_task_llm(text, task_code=code)
+        if combined:
+            risk = assess_risk(combined.intent, combined.entities)
+            with transaction.atomic():
+                task = Task.objects.create(
+                    code=code,
+                    customer_request_text=text,
+                    intent=combined.intent,
+                    entities=combined.entities,
+                    risk_score=risk.score,
+                    risk_reasons=risk.reasons,
+                    assigned_team=combined.assigned_team,
+                    assignment_reason=combined.assignment_reason,
+                    status=TaskStatus.PENDING,
+                )
+                _persist_entity_items(task, combined.entities)
+                _persist_steps_from_list(task, combined.steps)
+                _persist_messages_from_channel_strings(
+                    task, combined.messages_by_channel
+                )
+                TaskStatusHistory.objects.create(
+                    task=task,
+                    from_status=TaskStatus.PENDING,
+                    to_status=TaskStatus.PENDING,
+                )
+            return TaskCreationResult(
+                task=task,
+                extraction_provider="gemini",
+                fallback_used=False,
+                assignment_reason=combined.assignment_reason,
+                llm_fulfillment_used=True,
+                llm_assignment_used=True,
+            )
+
+    extraction = extract_intent_and_entities(text, prefer_local=combined_attempted)
     risk = assess_risk(extraction.intent, extraction.entities)
     assignment, llm_assignment_used = assign_employee_team_with_llm_optional(
-        extraction.intent, extraction.entities, text
+        extraction.intent,
+        extraction.entities,
+        text,
+        allow_llm=not combined_attempted,
     )
 
     code = _generate_task_code()
@@ -47,6 +90,7 @@ def create_task_from_request(customer_text: str) -> TaskCreationResult:
         assigned_team=assignment.team,
         risk_score=risk.score,
         customer_text=text,
+        allow_network=not combined_attempted,
     )
     llm_fulfillment_used = fulfil is not None
 

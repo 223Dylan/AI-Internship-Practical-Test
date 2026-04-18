@@ -34,7 +34,9 @@ class IntentExtractionResult:
     raw_response: str
 
 
-def extract_intent_and_entities(customer_text: str) -> IntentExtractionResult:
+def extract_intent_and_entities(
+    customer_text: str, *, prefer_local: bool = False
+) -> IntentExtractionResult:
     clean_text = customer_text.strip()
     if not clean_text:
         raise ValueError("customer_text is required")
@@ -43,7 +45,7 @@ def extract_intent_and_entities(customer_text: str) -> IntentExtractionResult:
     api_key = os.environ.get("AI_API_KEY", "").strip()
 
     LOGGER.info("intent_extraction.start provider=%s text_length=%d", provider, len(clean_text))
-    if provider == "gemini" and api_key:
+    if not prefer_local and provider == "gemini" and api_key:
         try:
             raw_output = _call_gemini(clean_text, api_key)
             payload = _parse_llm_json(raw_output)

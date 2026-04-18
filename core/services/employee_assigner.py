@@ -8,7 +8,8 @@ from typing import Any, Optional
 from core.services.gemini_text import gemini_text_available, generate_text
 from core.services.intent_extractor import _parse_llm_json
 
-_VALID_TEAMS = frozenset({"FINANCE", "OPERATIONS", "LEGAL", "SUPPORT"})
+ASSIGNABLE_TEAMS = frozenset({"FINANCE", "OPERATIONS", "LEGAL", "SUPPORT"})
+_VALID_TEAMS = ASSIGNABLE_TEAMS
 
 
 @dataclass(frozen=True)
@@ -62,9 +63,13 @@ or when intent is unclear."""
 
 
 def assign_employee_team_with_llm_optional(
-    intent: str, entities: dict[str, Any], customer_text: str
+    intent: str,
+    entities: dict[str, Any],
+    customer_text: str,
+    *,
+    allow_llm: bool = True,
 ) -> tuple[AssignmentResult, bool]:
-    if _llm_assignment_enabled():
+    if allow_llm and _llm_assignment_enabled():
         assigned = try_llm_assign(intent, entities, customer_text)
         if assigned is not None:
             return assigned, True
