@@ -172,9 +172,3 @@ This section is required by the brief: using AI tools is fine; **not** being abl
 ```powershell
 .\.venv\Scripts\python manage.py test core.tests
 ```
-
----
-
-## License / confidentiality
-
-The practical test brief is confidential for applicants. This repository contains only the implementation; do not commit or redistribute Vunoh’s PDF in this repo.
