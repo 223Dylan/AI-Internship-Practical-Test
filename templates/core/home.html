@@ -11,7 +11,8 @@
       <header class="header">
         <h1>Vunoh Assistant</h1>
         <p class="subhead">
-          Describe what you need in plain English. We’ll extract intent, assess risk, and create a task you can track.
+          Describe what you need in plain English. We’ll extract intent, assess risk, assign a team, and
+          create a task with WhatsApp, email, and SMS drafts you can track on the dashboard.
         </p>
       </header>
 
@@ -29,7 +30,7 @@
 
           <div class="row">
             <button type="submit" class="button">Create Task</button>
-            <span class="hint">Step 8: dashboard supports live status updates</span>
+            <span class="hint">With Gemini configured, assignment and fulfillment can be LLM-generated with rule fallbacks.</span>
           </div>
         </form>
       </section>
@@ -45,10 +46,19 @@
           <button id="refresh-tasks" type="button" class="button secondary">Refresh</button>
         </div>
         <p class="dashboard-hint">
-          Update status with the buttons below; each change is saved immediately and recorded in status history.
+          Each row shows risk drivers at a glance. Open detail to read assignment rationale, workflow
+          steps, and all three outbound messages. Status changes save immediately and are recorded in
+          history.
         </p>
         <div id="dashboard-root" class="dashboard-root">
           <p class="muted-inline">Loading tasks…</p>
+        </div>
+        <div id="task-detail-panel" class="task-detail-panel" hidden>
+          <h3>Task detail</h3>
+          <p id="task-detail-placeholder" class="muted-inline">
+            Select a task to load steps and messages.
+          </p>
+          <div id="task-detail-body" class="task-detail-grid" hidden></div>
         </div>
       </section>
 
@@ -67,6 +77,9 @@
       const dashboardRoot = document.getElementById("dashboard-root");
       const refreshButton = document.getElementById("refresh-tasks");
       const requestInput = document.getElementById("request_text");
+      const detailPanel = document.getElementById("task-detail-panel");
+      const detailBody = document.getElementById("task-detail-body");
+      const detailPlaceholder = document.getElementById("task-detail-placeholder");
 
       const STATUS_OPTIONS = [
         { value: "PENDING", label: "Pending" },
@@ -74,14 +87,34 @@
         { value: "COMPLETED", label: "Completed" },
       ];
 
+      const PAGE_SIZE = 18;
+      let listState = {
+        items: [],
+        total: 0,
+        nextOffset: 0,
+        hasMore: false,
+        selectedCode: null,
+      };
+
       function formatStatus(value) {
         const found = STATUS_OPTIONS.find((item) => item.value === value);
         return found ? found.label : value;
       }
 
-      function renderDashboard(data) {
+      function summarizeRiskReasons(reasons) {
+        if (!reasons || reasons.length === 0) {
+          return "—";
+        }
+        const text = reasons.slice(0, 2).join(" · ");
+        if (reasons.length > 2) {
+          return `${text} (+${reasons.length - 2} more)`;
+        }
+        return text;
+      }
+
+      function renderDashboard() {
         dashboardRoot.innerHTML = "";
-        if (!data.tasks || data.tasks.length === 0) {
+        if (!listState.items || listState.items.length === 0) {
           const empty = document.createElement("p");
           empty.className = "muted-inline";
           empty.textContent = "No tasks yet. Create one above.";
@@ -94,7 +127,17 @@
 
         const thead = document.createElement("thead");
         const headRow = document.createElement("tr");
-        ["Code", "Intent", "Status", "Risk", "Team", "Created", "Actions"].forEach((text) => {
+        [
+          "Code",
+          "Intent",
+          "Status",
+          "Risk",
+          "Risk notes",
+          "Team",
+          "Created",
+          "Detail",
+          "Actions",
+        ].forEach((text) => {
           const th = document.createElement("th");
           th.textContent = text;
           headRow.appendChild(th);
@@ -103,7 +146,7 @@
         table.appendChild(thead);
 
         const tbody = document.createElement("tbody");
-        data.tasks.forEach((task) => {
+        listState.items.forEach((task) => {
           const tr = document.createElement("tr");
 
           const codeTd = document.createElement("td");
@@ -122,6 +165,14 @@
           riskTd.textContent = String(task.risk_score);
           tr.appendChild(riskTd);
 
+          const riskNotesTd = document.createElement("td");
+          const riskSpan = document.createElement("span");
+          riskSpan.className = "risk-ellipsis";
+          riskSpan.title = Array.isArray(task.risk_reasons) ? task.risk_reasons.join("\n") : "";
+          riskSpan.textContent = summarizeRiskReasons(task.risk_reasons);
+          riskNotesTd.appendChild(riskSpan);
+          tr.appendChild(riskNotesTd);
+
           const teamTd = document.createElement("td");
           teamTd.textContent = task.assigned_team;
           tr.appendChild(teamTd);
@@ -129,6 +180,18 @@
           const createdTd = document.createElement("td");
           createdTd.textContent = task.created_at;
           tr.appendChild(createdTd);
+
+          const detailTd = document.createElement("td");
+          const detailBtn = document.createElement("button");
+          detailBtn.type = "button";
+          detailBtn.className = "button tertiary";
+          detailBtn.textContent = "View";
+          detailBtn.addEventListener("click", async () => {
+            listState.selectedCode = task.task_code;
+            await loadTaskDetail(task.task_code);
+          });
+          detailTd.appendChild(detailBtn);
+          tr.appendChild(detailTd);
 
           const actionsTd = document.createElement("td");
           actionsTd.className = "actions-cell";
@@ -153,7 +216,10 @@
                   alert(err.error || "Status update failed");
                   return;
                 }
-                await loadTasks();
+                await loadTasks({ reset: true });
+                if (listState.selectedCode === task.task_code) {
+                  await loadTaskDetail(task.task_code);
+                }
               } catch (error) {
                 alert(`Request failed: ${error}`);
               } finally {
@@ -168,22 +234,149 @@
         });
         table.appendChild(tbody);
         dashboardRoot.appendChild(table);
+
+        const footer = document.createElement("div");
+        footer.className = "dashboard-footer";
+        const meta = document.createElement("span");
+        meta.className = "dashboard-meta";
+        meta.textContent = `Showing ${listState.items.length} of ${listState.total} tasks`;
+        footer.appendChild(meta);
+        if (listState.hasMore) {
+          const more = document.createElement("button");
+          more.type = "button";
+          more.className = "button secondary";
+          more.textContent = "Load more";
+          more.addEventListener("click", async () => {
+            more.disabled = true;
+            try {
+              await loadTasks({ reset: false });
+            } finally {
+              more.disabled = false;
+            }
+          });
+          footer.appendChild(more);
+        }
+        dashboardRoot.appendChild(footer);
       }
 
-      async function loadTasks() {
-        dashboardRoot.innerHTML = '<p class="muted-inline">Loading tasks…</p>';
+      async function loadTasks({ reset }) {
+        if (reset) {
+          dashboardRoot.innerHTML = '<p class="muted-inline">Loading tasks…</p>';
+          listState.items = [];
+          listState.nextOffset = 0;
+        }
+        const offset = reset ? 0 : listState.nextOffset;
         try {
-          const response = await fetch("/api/tasks/?limit=20", {
-            method: "GET",
-          });
+          const response = await fetch(
+            `/api/tasks/?limit=${PAGE_SIZE}&offset=${offset}`,
+            { method: "GET" }
+          );
           const data = await response.json();
           if (!response.ok) {
             dashboardRoot.textContent = data.error || "Failed to load tasks.";
             return;
           }
-          renderDashboard(data);
+          const chunk = data.tasks || [];
+          listState.total = data.total;
+          listState.hasMore = Boolean(data.has_more);
+          listState.nextOffset = data.offset + chunk.length;
+          if (reset) {
+            listState.items = chunk;
+          } else {
+            listState.items = listState.items.concat(chunk);
+          }
+          renderDashboard();
         } catch (error) {
           dashboardRoot.textContent = `Task load failed: ${error}`;
+        }
+      }
+
+      function renderTaskDetail(detail) {
+        detailPlaceholder.hidden = true;
+        detailBody.hidden = false;
+        detailBody.innerHTML = "";
+
+        const colA = document.createElement("div");
+        const colB = document.createElement("div");
+
+        const assignment = document.createElement("div");
+        assignment.className = "detail-block";
+        assignment.innerHTML =
+          '<span class="detail-label">Assignment</span>' +
+          `<p class="detail-pre">${detail.assigned_team}: ${detail.assignment_reason || "—"}</p>`;
+        colA.appendChild(assignment);
+
+        const risk = document.createElement("div");
+        risk.className = "detail-block";
+        const reasons = Array.isArray(detail.risk_reasons)
+          ? detail.risk_reasons.map((r) => `• ${r}`).join("\n")
+          : "";
+        risk.innerHTML =
+          `<span class="detail-label">Risk (${detail.risk_score})</span>` +
+          `<pre class="detail-pre">${reasons || "—"}</pre>`;
+        colA.appendChild(risk);
+
+        const request = document.createElement("div");
+        request.className = "detail-block";
+        request.innerHTML =
+          '<span class="detail-label">Customer request</span>' +
+          `<pre class="detail-pre">${detail.customer_request_text || ""}</pre>`;
+        colB.appendChild(request);
+
+        const steps = document.createElement("div");
+        steps.className = "detail-block";
+        const ol = document.createElement("ol");
+        ol.className = "detail-list";
+        (detail.steps || []).forEach((row) => {
+          const li = document.createElement("li");
+          li.textContent = row.description;
+          ol.appendChild(li);
+        });
+        const stepsWrap = document.createElement("div");
+        stepsWrap.innerHTML = '<span class="detail-label">Workflow steps</span>';
+        stepsWrap.appendChild(ol);
+        steps.appendChild(stepsWrap);
+        colB.appendChild(steps);
+
+        detailBody.appendChild(colA);
+        detailBody.appendChild(colB);
+
+        const messages = document.createElement("div");
+        messages.style.gridColumn = "1 / -1";
+        messages.className = "detail-block";
+        messages.innerHTML = '<span class="detail-label">Outbound messages (WhatsApp, email, SMS)</span>';
+        (detail.messages || []).forEach((m) => {
+          const sub = document.createElement("div");
+          sub.style.marginTop = "10px";
+          sub.innerHTML = `<span class="detail-label">${m.channel}</span>`;
+          const pre = document.createElement("pre");
+          pre.className = "detail-pre";
+          pre.textContent = m.content;
+          sub.appendChild(pre);
+          messages.appendChild(sub);
+        });
+        detailBody.appendChild(messages);
+
+        detailPanel.hidden = false;
+      }
+
+      async function loadTaskDetail(code) {
+        detailPanel.hidden = false;
+        detailPlaceholder.hidden = false;
+        detailBody.hidden = true;
+        detailPlaceholder.textContent = "Loading detail…";
+        try {
+          const response = await fetch(`/api/tasks/${encodeURIComponent(code)}/`, {
+            method: "GET",
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            detailPlaceholder.textContent = data.error || "Could not load task.";
+            return;
+          }
+          renderTaskDetail(data);
+        } catch (error) {
+          detailPlaceholder.textContent = `Detail request failed: ${error}`;
         }
       }
 
@@ -205,18 +398,21 @@
           });
           const data = await response.json();
           resultBox.textContent = JSON.stringify(data, null, 2);
-          await loadTasks();
+          await loadTasks({ reset: true });
+          if (data.task_code) {
+            listState.selectedCode = data.task_code;
+            await loadTaskDetail(data.task_code);
+          }
         } catch (error) {
           resultBox.textContent = `Request failed: ${error}`;
         }
       });
 
       refreshButton.addEventListener("click", async () => {
-        await loadTasks();
+        await loadTasks({ reset: true });
       });
 
-      loadTasks();
+      loadTasks({ reset: true });
     </script>
   </body>
 </html>
-

@@ -11,6 +11,7 @@ urlpatterns = [
         views.update_task_status,
         name="update_task_status",
     ),
+    path("api/tasks/<str:task_code>/", views.task_detail, name="task_detail"),
     path("api/tasks/", views.list_tasks, name="list_tasks"),
 ]
 

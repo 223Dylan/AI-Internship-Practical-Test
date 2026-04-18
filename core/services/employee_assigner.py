@@ -1,13 +1,74 @@
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
+
+from core.services.gemini_text import gemini_text_available, generate_text
+from core.services.intent_extractor import _parse_llm_json
+
+_VALID_TEAMS = frozenset({"FINANCE", "OPERATIONS", "LEGAL", "SUPPORT"})
 
 
 @dataclass(frozen=True)
 class AssignmentResult:
     team: str
     reason: str
+
+
+def _llm_assignment_enabled() -> bool:
+    if os.environ.get("AI_DISABLE_LLM_ASSIGNMENT", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return False
+    return gemini_text_available()
+
+
+def try_llm_assign(
+    intent: str, entities: dict[str, Any], customer_text: str
+) -> Optional[AssignmentResult]:
+    snippet = (customer_text or "").strip()
+    if len(snippet) > 4000:
+        snippet = snippet[:4000] + "…"
+    prompt = f"""You route customer tasks to one employee team at Vunoh.
+
+Return ONLY valid JSON (no markdown) with this exact shape:
+{{"team":"FINANCE"|"OPERATIONS"|"LEGAL"|"SUPPORT","reason":"one concise sentence citing the request"}}
+
+Intent label: {intent}
+Structured entities: {json.dumps(entities, ensure_ascii=False)}
+Customer message:
+\"\"\"{snippet}\"\"\"
+
+Choose FINANCE for payments/transfers/wallets/refunds. LEGAL for documents/titles/contracts/compliance.
+OPERATIONS for bookings, cleaning, drivers, airport runs, field services. SUPPORT for status checks
+or when intent is unclear."""
+
+    try:
+        text = generate_text(prompt, max_output_tokens=256)
+        parsed = _parse_llm_json(text)
+        if not isinstance(parsed, dict):
+            return None
+        team = str(parsed.get("team", "")).strip().upper()
+        reason = str(parsed.get("reason", "")).strip()
+        if team not in _VALID_TEAMS or not reason:
+            return None
+        return AssignmentResult(team=team, reason=reason)
+    except Exception:
+        return None
+
+
+def assign_employee_team_with_llm_optional(
+    intent: str, entities: dict[str, Any], customer_text: str
+) -> tuple[AssignmentResult, bool]:
+    if _llm_assignment_enabled():
+        assigned = try_llm_assign(intent, entities, customer_text)
+        if assigned is not None:
+            return assigned, True
+    return assign_employee_team(intent, entities), False
 
 
 def assign_employee_team(intent: str, entities: dict[str, Any]) -> AssignmentResult:

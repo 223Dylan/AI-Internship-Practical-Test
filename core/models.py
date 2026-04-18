@@ -47,6 +47,7 @@ class Task(models.Model):
     assigned_team = models.CharField(
         max_length=16, choices=EmployeeCategory.choices, db_index=True
     )
+    assignment_reason = models.TextField(blank=True)
 
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)

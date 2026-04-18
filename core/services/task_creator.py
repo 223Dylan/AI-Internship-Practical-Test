@@ -16,8 +16,9 @@ from core.models import (
     TaskStatusHistory,
     TaskStep,
 )
-from core.services.employee_assigner import assign_employee_team
+from core.services.employee_assigner import assign_employee_team_with_llm_optional
 from core.services.intent_extractor import extract_intent_and_entities
+from core.services.llm_fulfillment import try_llm_fulfillment
 from core.services.risk_scorer import assess_risk
 
 
@@ -27,28 +28,49 @@ class TaskCreationResult:
     extraction_provider: str
     fallback_used: bool
     assignment_reason: str
+    llm_fulfillment_used: bool
+    llm_assignment_used: bool
 
 
 def create_task_from_request(customer_text: str) -> TaskCreationResult:
-    extraction = extract_intent_and_entities(customer_text)
+    text = customer_text.strip()
+    extraction = extract_intent_and_entities(text)
     risk = assess_risk(extraction.intent, extraction.entities)
-    assignment = assign_employee_team(extraction.intent, extraction.entities)
+    assignment, llm_assignment_used = assign_employee_team_with_llm_optional(
+        extraction.intent, extraction.entities, text
+    )
+
+    code = _generate_task_code()
+    fulfil = try_llm_fulfillment(
+        task_code=code,
+        intent=extraction.intent,
+        assigned_team=assignment.team,
+        risk_score=risk.score,
+        customer_text=text,
+    )
+    llm_fulfillment_used = fulfil is not None
 
     with transaction.atomic():
         task = Task.objects.create(
-            code=_generate_task_code(),
-            customer_request_text=customer_text.strip(),
+            code=code,
+            customer_request_text=text,
             intent=extraction.intent,
             entities=extraction.entities,
             risk_score=risk.score,
             risk_reasons=risk.reasons,
             assigned_team=assignment.team,
+            assignment_reason=assignment.reason,
             status=TaskStatus.PENDING,
         )
 
         _persist_entity_items(task, extraction.entities)
-        _persist_steps(task, extraction.intent, extraction.entities)
-        _persist_messages(task)
+        if fulfil:
+            steps, messages_by_channel = fulfil
+            _persist_steps_from_list(task, steps)
+            _persist_messages_from_channel_strings(task, messages_by_channel)
+        else:
+            _persist_steps(task, extraction.intent, extraction.entities)
+            _persist_messages(task)
         TaskStatusHistory.objects.create(
             task=task,
             from_status=TaskStatus.PENDING,
@@ -60,7 +82,25 @@ def create_task_from_request(customer_text: str) -> TaskCreationResult:
         extraction_provider=extraction.provider,
         fallback_used=extraction.fallback_used,
         assignment_reason=assignment.reason,
+        llm_fulfillment_used=llm_fulfillment_used,
+        llm_assignment_used=llm_assignment_used,
     )
+
+
+def _persist_steps_from_list(task: Task, steps: list[str]) -> None:
+    for index, description in enumerate(steps, start=1):
+        TaskStep.objects.create(task=task, step_order=index, description=description)
+
+
+def _persist_messages_from_channel_strings(task: Task, messages: dict[str, str]) -> None:
+    mapping = {
+        "whatsapp": MessageChannel.WHATSAPP,
+        "email": MessageChannel.EMAIL,
+        "sms": MessageChannel.SMS,
+    }
+    for key, channel in mapping.items():
+        content = messages.get(key, "").strip()
+        TaskMessage.objects.create(task=task, channel=channel, content=content)
 
 
 def _persist_entity_items(task: Task, entities: dict[str, Any]) -> None:

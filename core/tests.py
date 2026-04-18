@@ -75,6 +75,9 @@ class IntentExtractionApiTests(TestCase):
         self.assertIn("messages", payload)
         self.assertEqual(task.assigned_team, "FINANCE")
         self.assertIn("assignment_reason", payload)
+        self.assertEqual(task.assignment_reason, payload["assignment_reason"])
+        self.assertFalse(payload["llm_fulfillment_used"])
+        self.assertFalse(payload["llm_assignment_used"])
 
     def test_create_task_api_generates_unique_codes(self):
         req_body = json.dumps({"request_text": "Please verify my land title deed for Karen."})
@@ -97,10 +100,52 @@ class IntentExtractionApiTests(TestCase):
         self.assertIn("tasks", payload)
         self.assertGreaterEqual(payload["count"], 1)
         self.assertIn("task_code", payload["tasks"][0])
+        self.assertIn("total", payload)
+        self.assertIn("offset", payload)
+        self.assertIn("has_more", payload)
+        self.assertIn("risk_reasons", payload["tasks"][0])
+        self.assertIsInstance(payload["tasks"][0]["risk_reasons"], list)
 
     def test_list_tasks_api_validates_limit(self):
         response = self.client.get("/api/tasks/?limit=bad")
         self.assertEqual(response.status_code, 400)
+
+    def test_list_tasks_api_supports_offset(self):
+        for i in range(3):
+            self.client.post(
+                "/api/tasks/create/",
+                data=json.dumps(
+                    {"request_text": f"Please verify land title deed number {i} for Karen."}
+                ),
+                content_type="application/json",
+            )
+        first = self.client.get("/api/tasks/?limit=2&offset=0")
+        self.assertEqual(first.status_code, 200)
+        second = self.client.get("/api/tasks/?limit=2&offset=2")
+        self.assertEqual(second.status_code, 200)
+        codes_a = {row["task_code"] for row in first.json()["tasks"]}
+        codes_b = {row["task_code"] for row in second.json()["tasks"]}
+        self.assertTrue(codes_a.isdisjoint(codes_b))
+
+    def test_task_detail_api_returns_full_task(self):
+        create = self.client.post(
+            "/api/tasks/create/",
+            data=json.dumps({"request_text": "Please verify my land title deed for Karen."}),
+            content_type="application/json",
+        )
+        code = create.json()["task_code"]
+        response = self.client.get(f"/api/tasks/{code}/")
+        self.assertEqual(response.status_code, 200)
+        detail = response.json()
+        self.assertEqual(detail["task_code"], code)
+        self.assertIn("customer_request_text", detail)
+        self.assertIn("assignment_reason", detail)
+        self.assertGreaterEqual(len(detail["steps"]), 1)
+        self.assertEqual(len(detail["messages"]), 3)
+
+    def test_task_detail_api_404_for_unknown_code(self):
+        response = self.client.get("/api/tasks/VNH-NOT-REAL-CODE0/")
+        self.assertEqual(response.status_code, 404)
 
     def test_update_task_status_persists_and_records_history(self):
         create = self.client.post(

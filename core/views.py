@@ -12,6 +12,26 @@ from .services.risk_scorer import assess_risk
 from .services.task_creator import create_task_from_request
 
 
+def _serialize_task_detail(task: Task) -> dict:
+    steps = list(task.steps.order_by("step_order").values("step_order", "description"))
+    messages = list(task.messages.values("channel", "content"))
+    return {
+        "task_code": task.code,
+        "status": task.status,
+        "intent": task.intent,
+        "entities": task.entities,
+        "risk_score": task.risk_score,
+        "risk_reasons": task.risk_reasons,
+        "assigned_team": task.assigned_team,
+        "assignment_reason": task.assignment_reason,
+        "customer_request_text": task.customer_request_text,
+        "created_at": task.created_at.isoformat(),
+        "updated_at": task.updated_at.isoformat(),
+        "steps": steps,
+        "messages": messages,
+    }
+
+
 def home(request):
     return render(request, "core/home.html")
 
@@ -93,31 +113,43 @@ def create_task(request):
             "messages": messages,
             "provider": creation.extraction_provider,
             "fallback_used": creation.fallback_used,
+            "llm_fulfillment_used": creation.llm_fulfillment_used,
+            "llm_assignment_used": creation.llm_assignment_used,
         },
         status=201,
     )
 
 
 @require_http_methods(["GET"])
+def task_detail(request, task_code: str):
+    task = get_object_or_404(Task, code=task_code)
+    return JsonResponse(_serialize_task_detail(task))
+
+
+@require_http_methods(["GET"])
 def list_tasks(request):
     limit_raw = request.GET.get("limit", "25")
+    offset_raw = request.GET.get("offset", "0")
     try:
         limit = max(1, min(int(limit_raw), 100))
+        offset = max(0, int(offset_raw))
     except (TypeError, ValueError):
-        return JsonResponse({"error": "limit must be an integer."}, status=400)
+        return JsonResponse(
+            {"error": "limit and offset must be integers."}, status=400
+        )
 
+    total = Task.objects.count()
+    upper = offset + limit
     tasks = []
-    queryset = (
-        Task.objects.all()
-        .values(
-            "code",
-            "intent",
-            "status",
-            "risk_score",
-            "assigned_team",
-            "created_at",
-        )[:limit]
-    )
+    queryset = Task.objects.all().values(
+        "code",
+        "intent",
+        "status",
+        "risk_score",
+        "risk_reasons",
+        "assigned_team",
+        "created_at",
+    )[offset:upper]
     for row in queryset:
         tasks.append(
             {
@@ -125,12 +157,23 @@ def list_tasks(request):
                 "intent": row["intent"],
                 "status": row["status"],
                 "risk_score": row["risk_score"],
+                "risk_reasons": row["risk_reasons"],
                 "assigned_team": row["assigned_team"],
                 "created_at": row["created_at"].isoformat(),
             }
         )
 
-    return JsonResponse({"count": len(tasks), "tasks": tasks})
+    has_more = offset + len(tasks) < total
+    return JsonResponse(
+        {
+            "count": len(tasks),
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": has_more,
+            "tasks": tasks,
+        }
+    )
 
 
 ALLOWED_STATUS_VALUES = {
