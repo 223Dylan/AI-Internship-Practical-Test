@@ -30,9 +30,9 @@ copy .env.example .env
 
 Open **http://127.0.0.1:8000/** — the homepage includes the text input, JSON output from task creation, and the task dashboard.
 
-**Public hosting:** Set **`ALLOWED_HOSTS`** and **`CSRF_TRUSTED_ORIGINS`** in the host environment (comma-separated). The **build** step should run migrations and collect static files, e.g.  
-`pip install -r requirements.txt && python manage.py migrate && python manage.py collectstatic --noinput`  
-The repo includes a **`Procfile`** that runs Gunicorn with **`--timeout 120`** so **task creation** (Gemini) is not cut off at the default 30s worker limit—override the start command on your host only if you know what you’re doing. **WhiteNoise** serves `/static/` after `collectstatic`.
+**Public hosting:** Set **`ALLOWED_HOSTS`** and **`CSRF_TRUSTED_ORIGINS`** in the host environment (comma-separated). **Build** should install deps and collect static files, e.g.  
+`pip install -r requirements.txt && python manage.py collectstatic --noinput`  
+The **`Procfile`** runs **`scripts/start_web.sh`**, which applies **`migrate`** on each boot (so SQLite gets tables even though `db.sqlite3` is gitignored), then starts Gunicorn with **`--timeout 120`** for slow Gemini calls. On **Render**, set **Start Command** to `bash scripts/start_web.sh` (or leave default if it uses the Procfile). **WhiteNoise** serves `/static/` after `collectstatic`. Note: SQLite on ephemeral hosts may reset on redeploys; use Postgres or a disk if you need durable production data.
 
 ---
 

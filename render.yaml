@@ -1,0 +1,8 @@
+# Optional Render Blueprint: sync your service name/plan with the dashboard if you already created the app.
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: ai-internship-practical-test
+    runtime: python
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: bash scripts/start_web.sh
