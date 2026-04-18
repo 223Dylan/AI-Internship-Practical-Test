@@ -70,7 +70,7 @@ def extract_intent_and_entities(customer_text: str) -> IntentExtractionResult:
 
 
 def _call_gemini(customer_text: str, api_key: str) -> str:
-    model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+    model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
     prompt = _build_prompt(customer_text)
     endpoint = (
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"

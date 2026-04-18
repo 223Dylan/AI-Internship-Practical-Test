@@ -16,7 +16,7 @@ def generate_text(prompt: str, *, max_output_tokens: int = 1024) -> str:
     if not api_key:
         raise RuntimeError("AI_API_KEY is required for Gemini.")
 
-    model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash").strip()
+    model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash").strip()
     endpoint = (
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         f"?key={api_key}"
