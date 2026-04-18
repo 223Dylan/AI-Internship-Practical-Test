@@ -25,18 +25,56 @@ def _env_truthy(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in ("1", "true", "yes")
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
 def _split_csv_env(name: str, default: str) -> list[str]:
     raw = os.environ.get(name, default)
     return [part.strip() for part in raw.split(",") if part.strip()]
 
 
 # Application configuration from `.env` / process environment (single place for os.environ reads).
+# AI_PROVIDER: mock | gemini (Google Generative Language API) | openrouter (OpenAI-compatible chat)
 AI_PROVIDER = (os.environ.get("AI_PROVIDER", "mock") or "mock").strip().lower() or "mock"
 AI_API_KEY = os.environ.get("AI_API_KEY", "").strip()
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash").strip()
+# OpenRouter (https://openrouter.ai): use with AI_PROVIDER=openrouter. Key falls back to AI_API_KEY if unset.
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
+OPENROUTER_BASE_URL = (
+    os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").strip().rstrip("/")
+)
+OPENROUTER_MODEL = os.environ.get(
+    "OPENROUTER_MODEL", "google/gemini-2.0-flash-001"
+).strip()
+OPENROUTER_HTTP_REFERER = os.environ.get("OPENROUTER_HTTP_REFERER", "").strip()
+OPENROUTER_APP_TITLE = os.environ.get("OPENROUTER_APP_TITLE", "Vunoh Assistant").strip()
 AI_COMBINED_LLM_DISABLED = _env_truthy("AI_DISABLE_COMBINED_TASK_LLM")
 AI_ASSIGNMENT_LLM_DISABLED = _env_truthy("AI_DISABLE_LLM_ASSIGNMENT")
 AI_FULFILLMENT_LLM_DISABLED = _env_truthy("AI_DISABLE_LLM_FULFILLMENT")
+
+# Gemini HTTP: retries for 429 / transient errors (see core.services.gemini_http).
+GEMINI_HTTP_MAX_RETRIES = max(1, _env_int("GEMINI_HTTP_MAX_RETRIES", 8))
+GEMINI_HTTP_BASE_DELAY = max(0.1, _env_float("GEMINI_HTTP_BASE_DELAY", 1.25))
+GEMINI_HTTP_MAX_BACKOFF = max(1.0, _env_float("GEMINI_HTTP_MAX_BACKOFF", 45.0))
+# Cap total time spent sleeping between retries (leave headroom under Gunicorn --timeout).
+GEMINI_HTTP_MAX_TOTAL_SLEEP = max(5.0, _env_float("GEMINI_HTTP_MAX_TOTAL_SLEEP", 85.0))
 
 
 # Quick-start development settings - unsuitable for production

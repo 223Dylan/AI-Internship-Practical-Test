@@ -5,6 +5,7 @@ import string
 from dataclasses import dataclass
 from typing import Any
 
+from django.conf import settings
 from django.db import transaction
 
 from core.models import (
@@ -67,7 +68,7 @@ def create_task_from_request(customer_text: str) -> TaskCreationResult:
                 )
             return TaskCreationResult(
                 task=task,
-                extraction_provider="gemini",
+                extraction_provider=settings.AI_PROVIDER,
                 fallback_used=False,
                 assignment_reason=combined.assignment_reason,
                 llm_fulfillment_used=True,

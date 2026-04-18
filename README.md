@@ -13,7 +13,7 @@ The brief (problem, stack constraints, features, submission rules, and evaluatio
 | Backend  | **Django** (Python) |
 | Frontend | **HTML, CSS, vanilla JavaScript** (no frontend frameworks) |
 | Database | **SQLite** (file `db.sqlite3`; suitable for local demo and submission dump) |
-| AI       | **Google Gemini** via REST when configured; **deterministic heuristic fallback** when offline, in tests, or when the API errors (e.g. rate limits) |
+| AI       | **Google Gemini** (direct) or **OpenRouter** (OpenAI-compatible chat, e.g. Gemini models); **retries with backoff** (`gemini_http`); **deterministic heuristic fallback** when `AI_PROVIDER=mock`, in tests, or when the API errors |
 
 ---
 
@@ -33,6 +33,10 @@ Open **http://127.0.0.1:8000/** — the homepage includes the text input, JSON o
 **Public hosting:** Set **`ALLOWED_HOSTS`** and **`CSRF_TRUSTED_ORIGINS`** in the host environment (comma-separated). **Build** should install deps and collect static files, e.g.  
 `pip install -r requirements.txt && python manage.py collectstatic --noinput`  
 The **`Procfile`** runs **`scripts/start_web.sh`**, which applies **`migrate`** on each boot (so SQLite gets tables even though `db.sqlite3` is gitignored), then starts Gunicorn with **`--timeout 120`** for slow Gemini calls. On **Render**, set **Start Command** to `bash scripts/start_web.sh` (or leave default if it uses the Procfile). **WhiteNoise** serves `/static/` after `collectstatic`. Note: SQLite on ephemeral hosts may reset on redeploys; use Postgres or a disk if you need durable production data.
+
+**Gemini limits:** Optional env vars tune HTTP behavior: `GEMINI_HTTP_MAX_RETRIES` (default 8), `GEMINI_HTTP_BASE_DELAY`, `GEMINI_HTTP_MAX_BACKOFF`, `GEMINI_HTTP_MAX_TOTAL_SLEEP` (caps total wait between retries so deploys stay under Gunicorn’s worker timeout). Responses that indicate **billing/quota exhaustion** are not retried. If the API shows `limit: 0` for free tier, enable billing or switch models in Google AI Studio—retries cannot fix account quota.
+
+**OpenRouter:** Set `AI_PROVIDER=openrouter`, **`OPENROUTER_API_KEY`** (or reuse **`AI_API_KEY`** for a single key), and optionally **`OPENROUTER_MODEL`** (default `google/gemini-2.0-flash-001`). Optional: **`OPENROUTER_BASE_URL`** (default `https://openrouter.ai/api/v1`), **`OPENROUTER_HTTP_REFERER`**, **`OPENROUTER_APP_TITLE`**. Pick the exact model id from [OpenRouter’s model list](https://openrouter.ai/models).
 
 ---
 

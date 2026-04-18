@@ -6,7 +6,7 @@ from typing import Any, Optional
 from django.conf import settings
 
 from core.services.employee_assigner import ASSIGNABLE_TEAMS
-from core.services.gemini_text import gemini_text_available, generate_text
+from core.services.gemini_text import generate_text, llm_text_available
 from core.services.intent_extractor import (
     _normalize_entities,
     _normalize_intent,
@@ -28,7 +28,7 @@ class CombinedTaskLLMResult:
 def combined_task_llm_enabled() -> bool:
     if settings.AI_COMBINED_LLM_DISABLED:
         return False
-    return gemini_text_available()
+    return llm_text_available()
 
 
 def try_combined_task_llm(

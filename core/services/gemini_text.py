@@ -1,19 +1,50 @@
 from __future__ import annotations
 
 import json
-from urllib import error, request
 
 from django.conf import settings
 
+from core.services.gemini_http import post_generate_content
+from core.services.openrouter_text import openrouter_api_key, openrouter_generate_text
+
+
+def llm_text_available() -> bool:
+    p = settings.AI_PROVIDER
+    if p == "gemini":
+        return bool(settings.AI_API_KEY)
+    if p == "openrouter":
+        return bool(openrouter_api_key())
+    return False
+
 
 def gemini_text_available() -> bool:
-    return settings.AI_PROVIDER == "gemini" and bool(settings.AI_API_KEY)
+    """Backward-compatible alias: true when Gemini or OpenRouter LLM is configured."""
+    return llm_text_available()
 
 
-def generate_text(prompt: str, *, max_output_tokens: int = 1024) -> str:
+def generate_text(
+    prompt: str,
+    *,
+    max_output_tokens: int = 1024,
+    temperature: float = 0.2,
+) -> str:
+    provider = settings.AI_PROVIDER
+    if provider == "openrouter":
+        return openrouter_generate_text(
+            prompt,
+            max_output_tokens=max_output_tokens,
+            temperature=temperature,
+            timeout=110.0,
+        )
+
+    if provider != "gemini":
+        raise RuntimeError(
+            f"AI_PROVIDER must be 'gemini' or 'openrouter' for generate_text (got {provider!r})."
+        )
+
     api_key = settings.AI_API_KEY
     if not api_key:
-        raise RuntimeError("Gemini API key is not configured.")
+        raise RuntimeError("Gemini API key is not configured (AI_API_KEY).")
 
     model = settings.GEMINI_MODEL
     endpoint = (
@@ -23,20 +54,11 @@ def generate_text(prompt: str, *, max_output_tokens: int = 1024) -> str:
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 0.2,
+            "temperature": temperature,
             "maxOutputTokens": max_output_tokens,
         },
     }
-    data = json.dumps(payload).encode("utf-8")
-    req = request.Request(
-        endpoint, data=data, headers={"Content-Type": "application/json"}, method="POST"
-    )
-    try:
-        # Must stay below Gunicorn --timeout; LLM calls can be slow.
-        with request.urlopen(req, timeout=110) as resp:
-            body = resp.read().decode("utf-8")
-    except error.URLError as exc:
-        raise RuntimeError(f"Gemini request failed: {exc}") from exc
+    body = post_generate_content(endpoint, payload, timeout=110.0)
 
     parsed = json.loads(body)
     candidates = parsed.get("candidates", [])

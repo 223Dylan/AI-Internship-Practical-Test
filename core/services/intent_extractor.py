@@ -5,9 +5,10 @@ import logging
 import re
 from dataclasses import dataclass
 from typing import Any
-from urllib import error, request
 
 from django.conf import settings
+
+from core.services.gemini_text import generate_text, llm_text_available
 
 LOGGER = logging.getLogger(__name__)
 
@@ -43,24 +44,27 @@ def extract_intent_and_entities(
         raise ValueError("customer_text is required")
 
     provider = settings.AI_PROVIDER
-    api_key = settings.AI_API_KEY
 
     LOGGER.info("intent_extraction.start provider=%s text_length=%d", provider, len(clean_text))
-    if not prefer_local and provider == "gemini" and api_key:
+    if not prefer_local and llm_text_available():
         try:
-            raw_output = _call_gemini(clean_text, api_key)
+            raw_output = generate_text(
+                _build_prompt(clean_text),
+                max_output_tokens=350,
+                temperature=0.1,
+            )
             payload = _parse_llm_json(raw_output)
             normalized_intent = _normalize_intent(payload.get("intent", ""))
             entities = _normalize_entities(payload.get("entities"))
             return IntentExtractionResult(
                 intent=normalized_intent,
                 entities=entities,
-                provider="gemini",
+                provider=provider,
                 fallback_used=False,
                 raw_response=raw_output,
             )
         except Exception as exc:
-            LOGGER.warning("intent_extraction.gemini_failed error=%s", exc)
+            LOGGER.warning("intent_extraction.llm_failed error=%s", exc)
 
     fallback = _heuristic_fallback(clean_text)
     return IntentExtractionResult(
@@ -70,42 +74,6 @@ def extract_intent_and_entities(
         fallback_used=True,
         raw_response=json.dumps(fallback),
     )
-
-
-def _call_gemini(customer_text: str, api_key: str) -> str:
-    model = settings.GEMINI_MODEL
-    prompt = _build_prompt(customer_text)
-    endpoint = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        f"?key={api_key}"
-    )
-
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 350},
-    }
-    data = json.dumps(payload).encode("utf-8")
-    req = request.Request(
-        endpoint, data=data, headers={"Content-Type": "application/json"}, method="POST"
-    )
-
-    try:
-        with request.urlopen(req, timeout=20) as resp:
-            body = resp.read().decode("utf-8")
-    except error.URLError as exc:
-        raise RuntimeError(f"Gemini request failed: {exc}") from exc
-
-    parsed = json.loads(body)
-    candidates = parsed.get("candidates", [])
-    if not candidates:
-        raise RuntimeError("Gemini returned no candidates")
-
-    parts = candidates[0].get("content", {}).get("parts", [])
-    text_chunks = [item.get("text", "") for item in parts if isinstance(item, dict)]
-    joined_text = "\n".join(text_chunks).strip()
-    if not joined_text:
-        raise RuntimeError("Gemini returned empty text")
-    return joined_text
 
 
 def _build_prompt(customer_text: str) -> str:
@@ -192,4 +160,3 @@ def _heuristic_fallback(customer_text: str) -> dict[str, Any]:
     if "status" in text or "follow up" in text or "track" in text:
         return {"intent": "check_status", "entities": entities}
     return {"intent": "send_money", "entities": entities}
-

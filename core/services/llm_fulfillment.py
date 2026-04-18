@@ -4,14 +4,14 @@ from typing import Any, Optional
 
 from django.conf import settings
 
-from core.services.gemini_text import gemini_text_available, generate_text
+from core.services.gemini_text import generate_text, llm_text_available
 from core.services.intent_extractor import _parse_llm_json
 
 
 def _llm_fulfillment_enabled() -> bool:
     if settings.AI_FULFILLMENT_LLM_DISABLED:
         return False
-    return gemini_text_available()
+    return llm_text_available()
 
 
 def _truncate_sms(text: str, limit: int = 160) -> str:
