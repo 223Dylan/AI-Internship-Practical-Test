@@ -45,24 +45,23 @@
           </section>
 
           <section class="card output-card">
+            <div id="task-detail-panel" class="task-detail-panel" hidden>
+              <h3>Task detail</h3>
+              <p id="task-detail-placeholder" class="muted-inline">
+                Select a task below to load steps and messages.
+              </p>
+              <div id="task-detail-body" class="task-detail-grid" hidden></div>
+            </div>
             <div class="dashboard-header">
               <h2 class="result-title">Saved tasks dashboard</h2>
               <button id="refresh-tasks" type="button" class="button secondary">Refresh</button>
             </div>
             <p class="dashboard-hint">
-              Each row shows risk drivers at a glance. Open detail to read assignment rationale, workflow
-              steps, and all three outbound messages. Status changes save immediately and are recorded in
-              history.
+              Each row shows risk drivers at a glance. Details for the selected task appear above. Status
+              changes save immediately and are recorded in history.
             </p>
             <div id="dashboard-root" class="dashboard-root">
               <p class="muted-inline">Loading tasks…</p>
-            </div>
-            <div id="task-detail-panel" class="task-detail-panel" hidden>
-              <h3>Task detail</h3>
-              <p id="task-detail-placeholder" class="muted-inline">
-                Select a task to load steps and messages.
-              </p>
-              <div id="task-detail-body" class="task-detail-grid" hidden></div>
             </div>
           </section>
         </div>

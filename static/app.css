@@ -366,7 +366,7 @@ body {
 }
 
 .task-detail-panel {
-  margin-top: 16px;
+  margin: 0 0 18px;
   padding: 14px;
   border-radius: 12px;
   border: 1px solid var(--border);
