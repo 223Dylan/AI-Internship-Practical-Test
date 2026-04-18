@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Any, Optional
+
+from django.conf import settings
 
 from core.services.employee_assigner import ASSIGNABLE_TEAMS
 from core.services.gemini_text import gemini_text_available, generate_text
@@ -25,11 +26,7 @@ class CombinedTaskLLMResult:
 
 
 def combined_task_llm_enabled() -> bool:
-    if os.environ.get("AI_DISABLE_COMBINED_TASK_LLM", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    ):
+    if settings.AI_COMBINED_LLM_DISABLED:
         return False
     return gemini_text_available()
 

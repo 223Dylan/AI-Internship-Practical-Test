@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 from dataclasses import dataclass
 from typing import Any
 from urllib import error, request
+
+from django.conf import settings
 
 LOGGER = logging.getLogger(__name__)
 
@@ -41,8 +42,8 @@ def extract_intent_and_entities(
     if not clean_text:
         raise ValueError("customer_text is required")
 
-    provider = os.environ.get("AI_PROVIDER", "mock").strip().lower() or "mock"
-    api_key = os.environ.get("AI_API_KEY", "").strip()
+    provider = settings.AI_PROVIDER
+    api_key = settings.AI_API_KEY
 
     LOGGER.info("intent_extraction.start provider=%s text_length=%d", provider, len(clean_text))
     if not prefer_local and provider == "gemini" and api_key:
@@ -72,7 +73,7 @@ def extract_intent_and_entities(
 
 
 def _call_gemini(customer_text: str, api_key: str) -> str:
-    model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+    model = settings.GEMINI_MODEL
     prompt = _build_prompt(customer_text)
     endpoint = (
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"

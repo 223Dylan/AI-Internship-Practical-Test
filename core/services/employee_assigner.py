@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from typing import Any, Optional
+
+from django.conf import settings
 
 from core.services.gemini_text import gemini_text_available, generate_text
 from core.services.intent_extractor import _parse_llm_json
@@ -19,11 +20,7 @@ class AssignmentResult:
 
 
 def _llm_assignment_enabled() -> bool:
-    if os.environ.get("AI_DISABLE_LLM_ASSIGNMENT", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    ):
+    if settings.AI_ASSIGNMENT_LLM_DISABLED:
         return False
     return gemini_text_available()
 

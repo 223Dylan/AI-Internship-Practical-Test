@@ -21,6 +21,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes")
+
+
+# Application configuration from `.env` / process environment (single place for os.environ reads).
+AI_PROVIDER = (os.environ.get("AI_PROVIDER", "mock") or "mock").strip().lower() or "mock"
+AI_API_KEY = os.environ.get("AI_API_KEY", "").strip()
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash").strip()
+AI_COMBINED_LLM_DISABLED = _env_truthy("AI_DISABLE_COMBINED_TASK_LLM")
+AI_ASSIGNMENT_LLM_DISABLED = _env_truthy("AI_DISABLE_LLM_ASSIGNMENT")
+AI_FULFILLMENT_LLM_DISABLED = _env_truthy("AI_DISABLE_LLM_FULFILLMENT")
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 

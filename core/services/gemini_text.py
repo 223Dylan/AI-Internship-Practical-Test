@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 import json
-import os
 from urllib import error, request
+
+from django.conf import settings
 
 
 def gemini_text_available() -> bool:
-    provider = os.environ.get("AI_PROVIDER", "mock").strip().lower()
-    key = os.environ.get("AI_API_KEY", "").strip()
-    return provider == "gemini" and bool(key)
+    return settings.AI_PROVIDER == "gemini" and bool(settings.AI_API_KEY)
 
 
 def generate_text(prompt: str, *, max_output_tokens: int = 1024) -> str:
-    api_key = os.environ.get("AI_API_KEY", "").strip()
+    api_key = settings.AI_API_KEY
     if not api_key:
-        raise RuntimeError("AI_API_KEY is required for Gemini.")
+        raise RuntimeError("Gemini API key is not configured.")
 
-    model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash").strip()
+    model = settings.GEMINI_MODEL
     endpoint = (
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         f"?key={api_key}"
