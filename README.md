@@ -108,6 +108,19 @@ Invoke-RestMethod -Method Post `
 - Step 6 complete: step generation + three-format message persistence.
 - Step 7 complete: explicit employee assignment routing and rationale exposure.
 - Step 8 complete: dashboard UI + immediate status updates with history.
+- Step 9 complete: sample data seed command + committed SQL dump for submission.
+
+## Sample data + SQL dump (Step 9)
+- Committed file: [`sql/submission_sample.sql`](sql/submission_sample.sql) (schema + five fully populated tasks: entities, steps, messages, risk, assignment, status history).
+- Regenerate locally (optional):
+
+```bash
+.\.venv\Scripts\python manage.py migrate
+.\.venv\Scripts\python manage.py seed_sample_tasks --clear
+.\.venv\Scripts\python manage.py export_sqlite_dump sql/submission_sample.sql
+```
+
+- `seed_sample_tasks` creates five requests covering all intents and applies mixed statuses so history rows exist beyond the initial creation record.
 
 ## Decisions I made and why (to be completed)
 - Which AI tools I used and where
