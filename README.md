@@ -105,6 +105,8 @@ Reasons are stored in `risk_reasons` and surfaced in the UI so the score is expl
 See [`.env.example`](.env.example). Important:
 
 - **`DJANGO_SECRET_KEY`** — required non-empty for the app to run.
+- **`ALLOWED_HOSTS`** — comma-separated hostnames; on Render set your service URL (e.g. `your-app.onrender.com,127.0.0.1,localhost`) or you get `DisallowedHost`.
+- **`CSRF_TRUSTED_ORIGINS`** — comma-separated origins with scheme for HTTPS (e.g. `https://your-app.onrender.com`) so forms and POST APIs work behind TLS.
 - **`AI_PROVIDER`** — `gemini` to use Gemini where implemented; otherwise mock/heuristic paths dominate.
 - **`AI_API_KEY`** — Gemini API key (never commit; `.env` is gitignored).
 - **`GEMINI_MODEL`** — defaults to a current Flash model id (see `.env.example`).
