@@ -23,8 +23,7 @@ The brief (problem, stack constraints, features, submission rules, and evaluatio
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt
 copy .env.example .env
-# Edit .env: set DJANGO_SECRET_KEY to any non-empty string for local dev.
-# Optional: AI_PROVIDER=gemini and AI_API_KEY for live LLM calls.
+# Edit `.env` with any settings your machine or host requires (file is gitignored).
 .\.venv\Scripts\python manage.py migrate
 .\.venv\Scripts\python manage.py runserver
 ```
@@ -100,19 +99,6 @@ Reasons are stored in `risk_reasons` and surfaced in the UI so the score is expl
 
 ---
 
-## Environment variables
-
-See [`.env.example`](.env.example). Important:
-
-- **`DJANGO_SECRET_KEY`** — required non-empty for the app to run.
-- **`AI_PROVIDER`** — `gemini` to use Gemini where implemented; otherwise mock/heuristic paths dominate.
-- **`AI_API_KEY`** — Gemini API key (never commit; `.env` is gitignored).
-- **`GEMINI_MODEL`** — defaults to a current Flash model id (see `.env.example`).
-- **`AI_DISABLE_COMBINED_TASK_LLM`** — set to `1` to force the older multi-call path (debug only).
-- **`AI_DISABLE_LLM_ASSIGNMENT` / `AI_DISABLE_LLM_FULFILLMENT`** — opt out of extra LLM calls when combined mode is off.
-
----
-
 ## Sample data and SQL submission file
 
 Regenerate the dump after schema or seed changes:
@@ -144,7 +130,7 @@ This section is required by the brief: using AI tools is fine; **not** being abl
 ### Which AI tools I used and for what
 
 - **Cursor (and LLM assistance)** — scaffolding, refactors, tests, and documentation while I kept ownership of architecture and behavior. I treated suggestions as drafts: I traced every path in Django (views → services → models) and adjusted when something didn’t match the brief or the database schema.
-- **Google Gemini** — optional “AI brain” for intent shaping and for **one structured JSON response** on task create (intent, entities, team, steps, and three messages) when `AI_PROVIDER=gemini` and a key is set. When Gemini is unavailable or returns errors, **heuristics and templates** keep the app runnable and testable.
+- **Google Gemini** — optional “AI brain” for intent shaping and for **one structured JSON response** on task create (intent, entities, team, steps, and three messages) when the remote model is enabled in configuration. When Gemini is unavailable or returns errors, **heuristics and templates** keep the app runnable and testable.
 
 ### How I designed the prompts (and what I deliberately excluded)
 
@@ -154,7 +140,7 @@ This section is required by the brief: using AI tools is fine; **not** being abl
 
 ### One decision where I overrode a default suggestion
 
-- **Default Gemini model name** — Early defaults used `gemini-1.5-flash`, which started returning **404** against the current `generativelanguage.googleapis.com` endpoint. I moved the default to **`gemini-2.0-flash`** (and document `GEMINI_MODEL` in `.env.example`) instead of blindly trusting an older tutorial string. That’s a small change but it’s the difference between “works” and “mysteriously broken” for reviewers running the repo.
+- **Default Gemini model name** — Early defaults used `gemini-1.5-flash`, which started returning **404** against the current `generativelanguage.googleapis.com` endpoint. I moved the default to **`gemini-2.0-flash`** in code instead of blindly trusting an older tutorial string. That’s a small change but it’s the difference between “works” and “mysteriously broken” for reviewers running the repo.
 
 ### One thing that didn’t work as expected and how I fixed it
 
