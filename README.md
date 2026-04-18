@@ -32,7 +32,7 @@ Open **http://127.0.0.1:8000/** — the homepage includes the text input, JSON o
 
 **Public hosting:** Set **`ALLOWED_HOSTS`** and **`CSRF_TRUSTED_ORIGINS`** in the host environment (comma-separated). The **build** step should run migrations and collect static files, e.g.  
 `pip install -r requirements.txt && python manage.py migrate && python manage.py collectstatic --noinput`  
-then start Gunicorn on `$PORT`. **WhiteNoise** serves `/static/` (CSS) under Gunicorn; without `collectstatic`, styles will not load.
+The repo includes a **`Procfile`** that runs Gunicorn with **`--timeout 120`** so **task creation** (Gemini) is not cut off at the default 30s worker limit—override the start command on your host only if you know what you’re doing. **WhiteNoise** serves `/static/` after `collectstatic`.
 
 ---
 

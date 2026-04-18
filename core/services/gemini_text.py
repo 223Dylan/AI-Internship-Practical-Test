@@ -32,7 +32,8 @@ def generate_text(prompt: str, *, max_output_tokens: int = 1024) -> str:
         endpoint, data=data, headers={"Content-Type": "application/json"}, method="POST"
     )
     try:
-        with request.urlopen(req, timeout=45) as resp:
+        # Must stay below Gunicorn --timeout; LLM calls can be slow.
+        with request.urlopen(req, timeout=110) as resp:
             body = resp.read().decode("utf-8")
     except error.URLError as exc:
         raise RuntimeError(f"Gemini request failed: {exc}") from exc
