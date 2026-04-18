@@ -16,51 +16,69 @@
         </p>
       </header>
 
-      <section class="card">
-        <form id="intent-form">
-          <label class="label" for="request_text">Your request</label>
-          <textarea
-            id="request_text"
-            name="request_text"
-            class="textarea"
-            rows="5"
-            placeholder="e.g. I need to send KES 15,000 to my mother in Kisumu urgently."
-            required
-          ></textarea>
+      <div class="layout-split">
+        <div class="layout-split__main">
+          <section class="card">
+            <form id="intent-form">
+              <label class="label" for="request_text">Your request</label>
+              <textarea
+                id="request_text"
+                name="request_text"
+                class="textarea"
+                rows="5"
+                placeholder="e.g. I need to send KES 15,000 to my mother in Kisumu urgently."
+                required
+              ></textarea>
 
-          <div class="row">
-            <button type="submit" class="button">Create Task</button>
-            <span class="hint">With Gemini configured, assignment and fulfillment can be LLM-generated with rule fallbacks.</span>
+              <div class="row">
+                <button type="submit" class="button">Create Task</button>
+                <span class="hint">With Gemini configured, assignment and fulfillment can be LLM-generated with rule fallbacks.</span>
+              </div>
+            </form>
+          </section>
+
+          <section class="card create-feedback-card">
+            <h2 class="result-title">Last creation</h2>
+            <p id="create-feedback" class="create-feedback">
+              Submit a request above to create and persist a task.
+            </p>
+          </section>
+
+          <section class="card output-card">
+            <div class="dashboard-header">
+              <h2 class="result-title">Saved tasks dashboard</h2>
+              <button id="refresh-tasks" type="button" class="button secondary">Refresh</button>
+            </div>
+            <p class="dashboard-hint">
+              Each row shows risk drivers at a glance. Open detail to read assignment rationale, workflow
+              steps, and all three outbound messages. Status changes save immediately and are recorded in
+              history.
+            </p>
+            <div id="dashboard-root" class="dashboard-root">
+              <p class="muted-inline">Loading tasks…</p>
+            </div>
+            <div id="task-detail-panel" class="task-detail-panel" hidden>
+              <h3>Task detail</h3>
+              <p id="task-detail-placeholder" class="muted-inline">
+                Select a task to load steps and messages.
+              </p>
+              <div id="task-detail-body" class="task-detail-grid" hidden></div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="layout-split__aside" aria-label="Developer tools">
+          <div class="aside-card">
+            <details class="json-details" id="json-details">
+              <summary class="json-details-summary">
+                Raw API response
+                <span class="json-details-hint">JSON · optional</span>
+              </summary>
+              <pre id="result" class="result-box result-box--aside">No response yet.</pre>
+            </details>
           </div>
-        </form>
-      </section>
-
-      <section class="card output-card">
-        <h2 class="result-title">Task creation output</h2>
-        <pre id="result" class="result-box">Submit a request to create and persist a task.</pre>
-      </section>
-
-      <section class="card output-card">
-        <div class="dashboard-header">
-          <h2 class="result-title">Saved tasks dashboard</h2>
-          <button id="refresh-tasks" type="button" class="button secondary">Refresh</button>
-        </div>
-        <p class="dashboard-hint">
-          Each row shows risk drivers at a glance. Open detail to read assignment rationale, workflow
-          steps, and all three outbound messages. Status changes save immediately and are recorded in
-          history.
-        </p>
-        <div id="dashboard-root" class="dashboard-root">
-          <p class="muted-inline">Loading tasks…</p>
-        </div>
-        <div id="task-detail-panel" class="task-detail-panel" hidden>
-          <h3>Task detail</h3>
-          <p id="task-detail-placeholder" class="muted-inline">
-            Select a task to load steps and messages.
-          </p>
-          <div id="task-detail-body" class="task-detail-grid" hidden></div>
-        </div>
-      </section>
+        </aside>
+      </div>
 
       <section class="examples">
         <h2>Examples</h2>
@@ -87,6 +105,7 @@
     <script>
       const form = document.getElementById("intent-form");
       const resultBox = document.getElementById("result");
+      const createFeedback = document.getElementById("create-feedback");
       const dashboardRoot = document.getElementById("dashboard-root");
       const refreshButton = document.getElementById("refresh-tasks");
       const requestInput = document.getElementById("request_text");
@@ -120,6 +139,14 @@
           .split("_")
           .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
           .join(" ");
+      }
+
+      function formatCreateSummary(data) {
+        const code = data.task_code || "—";
+        const intent = formatIntentLabel(data.intent) || "—";
+        const risk = data.risk_score != null ? data.risk_score : "—";
+        const team = data.assigned_team || "—";
+        return `Task ${code} created. Intent: ${intent}. Risk score: ${risk}. Team: ${team}.`;
       }
 
       function formatCreatedAt(iso) {
@@ -467,13 +494,13 @@
 
         const requestText = requestInput.value.trim();
         if (!requestText) {
-          resultBox.textContent = "Please enter a request first.";
+          createFeedback.textContent = "Please enter a request first.";
           return;
         }
 
         const submitBtn = form.querySelector('button[type="submit"]');
         if (submitBtn) submitBtn.disabled = true;
-        resultBox.textContent = "Creating task...";
+        createFeedback.textContent = "Creating task…";
         try {
           const response = await fetch("/api/tasks/create/", {
             method: "POST",
@@ -482,10 +509,12 @@
           });
           const data = await response.json();
           if (!response.ok) {
-            resultBox.textContent = data.error || "Task creation failed.";
+            createFeedback.textContent = data.error || "Task creation failed.";
+            resultBox.textContent = JSON.stringify(data, null, 2);
             showToast(data.error || "Could not create task.");
             return;
           }
+          createFeedback.textContent = formatCreateSummary(data);
           resultBox.textContent = JSON.stringify(data, null, 2);
           await loadTasks({ reset: true });
           if (data.task_code) {
@@ -494,7 +523,8 @@
           }
           showToast(`Task ${data.task_code} created.`);
         } catch (error) {
-          resultBox.textContent = `Request failed: ${error}`;
+          createFeedback.textContent = `Request failed: ${error}`;
+          resultBox.textContent = String(error);
           showToast(`Request failed: ${error}`);
         } finally {
           if (submitBtn) submitBtn.disabled = false;

@@ -22,9 +22,112 @@ body {
 }
 
 .container {
-  max-width: 1040px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 48px 20px 64px;
+}
+
+.layout-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 272px);
+  gap: 16px;
+  align-items: start;
+}
+
+.layout-split__main {
+  min-width: 0;
+}
+
+.layout-split__main > .card:not(:first-child) {
+  margin-top: 16px;
+}
+
+.layout-split__aside {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .layout-split {
+    grid-template-columns: 1fr;
+  }
+
+  .aside-card {
+    position: static;
+  }
+}
+
+.aside-card {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 12px;
+  position: sticky;
+  top: 12px;
+}
+
+.json-details {
+  margin: 0;
+}
+
+.json-details-summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.65);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+}
+
+.json-details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.json-details-summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  color: rgba(110, 231, 255, 0.65);
+  transition: transform 0.15s ease;
+}
+
+.json-details[open] .json-details-summary::before {
+  transform: rotate(90deg);
+}
+
+.json-details-hint {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.json-details .result-box {
+  margin-top: 10px;
+}
+
+.create-feedback-card .result-title {
+  margin-bottom: 6px;
+}
+
+.create-feedback {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.result-box--aside {
+  min-height: 72px;
+  max-height: min(48vh, 380px);
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(199, 249, 255, 0.88);
 }
 
 .header h1 {
@@ -153,10 +256,6 @@ body {
 .example-chip:hover {
   border-color: rgba(110, 231, 255, 0.35);
   background: rgba(110, 231, 255, 0.06);
-}
-
-.output-card {
-  margin-top: 16px;
 }
 
 .dashboard-header {
