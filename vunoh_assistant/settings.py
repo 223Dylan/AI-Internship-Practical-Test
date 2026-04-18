@@ -25,6 +25,11 @@ def _env_truthy(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in ("1", "true", "yes")
 
 
+def _split_csv_env(name: str, default: str) -> list[str]:
+    raw = os.environ.get(name, default)
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
 # Application configuration from `.env` / process environment (single place for os.environ reads).
 AI_PROVIDER = (os.environ.get("AI_PROVIDER", "mock") or "mock").strip().lower() or "mock"
 AI_API_KEY = os.environ.get("AI_API_KEY", "").strip()
@@ -46,7 +51,11 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+# Comma-separated hostnames (add your public hostname on the host dashboard or in `.env`).
+ALLOWED_HOSTS = _split_csv_env("ALLOWED_HOSTS", "127.0.0.1,localhost")
+
+# Comma-separated origins with scheme for HTTPS (required for CSRF on deployed sites).
+CSRF_TRUSTED_ORIGINS = _split_csv_env("CSRF_TRUSTED_ORIGINS", "")
 
 
 # Application definition
