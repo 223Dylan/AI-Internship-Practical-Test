@@ -21,11 +21,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 
-def _split_csv_env(name: str, default: str) -> list[str]:
-    raw = os.environ.get(name, default)
-    return [part.strip() for part in raw.split(",") if part.strip()]
-
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
@@ -38,14 +33,7 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-# Comma-separated. On Render add your hostname, e.g. app.onrender.com,127.0.0.1,localhost
-ALLOWED_HOSTS = _split_csv_env(
-    "ALLOWED_HOSTS",
-    "127.0.0.1,localhost",
-)
-
-# HTTPS POST / admin forms (comma-separated origins), e.g. https://app.onrender.com
-CSRF_TRUSTED_ORIGINS = _split_csv_env("CSRF_TRUSTED_ORIGINS", "")
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 
 # Application definition
