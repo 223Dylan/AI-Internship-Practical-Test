@@ -30,7 +30,9 @@ copy .env.example .env
 
 Open **http://127.0.0.1:8000/** — the homepage includes the text input, JSON output from task creation, and the task dashboard.
 
-**Public hosting:** Configure **`ALLOWED_HOSTS`** and **`CSRF_TRUSTED_ORIGINS`** as comma-separated values in the host environment (or `.env`) so Django accepts your site’s hostname and HTTPS form posts. Defaults keep local dev working without extra setup.
+**Public hosting:** Set **`ALLOWED_HOSTS`** and **`CSRF_TRUSTED_ORIGINS`** in the host environment (comma-separated). The **build** step should run migrations and collect static files, e.g.  
+`pip install -r requirements.txt && python manage.py migrate && python manage.py collectstatic --noinput`  
+then start Gunicorn on `$PORT`. **WhiteNoise** serves `/static/` (CSS) under Gunicorn; without `collectstatic`, styles will not load.
 
 ---
 

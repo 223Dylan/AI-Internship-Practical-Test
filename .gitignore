@@ -1,5 +1,7 @@
 /docs/
 
+/staticfiles/
+
 /.venv/
 __pycache__/
 *.py[cod]
