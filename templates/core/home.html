@@ -64,10 +64,23 @@
 
       <section class="examples">
         <h2>Examples</h2>
-        <ul>
-          <li>I need to send KES 15,000 to my mother in Kisumu urgently.</li>
-          <li>Please verify my land title deed for the plot in Karen.</li>
-          <li>Can someone clean my apartment in Westlands on Friday?</li>
+        <p class="examples-hint">Click an example to paste it into your request.</p>
+        <ul class="example-list">
+          <li>
+            <button type="button" class="example-chip">
+              I need to send KES 15,000 to my mother in Kisumu urgently.
+            </button>
+          </li>
+          <li>
+            <button type="button" class="example-chip">
+              Please verify my land title deed for the plot in Karen.
+            </button>
+          </li>
+          <li>
+            <button type="button" class="example-chip">
+              Can someone clean my apartment in Westlands on Friday?
+            </button>
+          </li>
         </ul>
       </section>
     </main>
@@ -101,6 +114,40 @@
         return found ? found.label : value;
       }
 
+      function formatIntentLabel(raw) {
+        if (!raw) return "";
+        return String(raw)
+          .split("_")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(" ");
+      }
+
+      function formatCreatedAt(iso) {
+        if (!iso) return "—";
+        const d = new Date(iso);
+        return Number.isNaN(d.getTime())
+          ? iso
+          : d.toLocaleString(undefined, {
+              dateStyle: "medium",
+              timeStyle: "short",
+            });
+      }
+
+      function showToast(message) {
+        let bar = document.getElementById("toast-bar");
+        if (!bar) {
+          bar = document.createElement("div");
+          bar.id = "toast-bar";
+          bar.className = "toast-bar";
+          bar.setAttribute("role", "status");
+          document.body.appendChild(bar);
+        }
+        bar.textContent = message;
+        bar.classList.add("toast-bar--visible");
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(() => bar.classList.remove("toast-bar--visible"), 4200);
+      }
+
       function summarizeRiskReasons(reasons) {
         if (!reasons || reasons.length === 0) {
           return "—";
@@ -124,6 +171,7 @@
 
         const table = document.createElement("table");
         table.className = "task-table";
+        table.setAttribute("aria-label", "Saved tasks");
 
         const thead = document.createElement("thead");
         const headRow = document.createElement("tr");
@@ -154,7 +202,7 @@
           tr.appendChild(codeTd);
 
           const intentTd = document.createElement("td");
-          intentTd.textContent = task.intent;
+          intentTd.textContent = formatIntentLabel(task.intent);
           tr.appendChild(intentTd);
 
           const statusTd = document.createElement("td");
@@ -178,7 +226,8 @@
           tr.appendChild(teamTd);
 
           const createdTd = document.createElement("td");
-          createdTd.textContent = task.created_at;
+          createdTd.textContent = formatCreatedAt(task.created_at);
+          createdTd.title = task.created_at || "";
           tr.appendChild(createdTd);
 
           const detailTd = document.createElement("td");
@@ -186,6 +235,10 @@
           detailBtn.type = "button";
           detailBtn.className = "button tertiary";
           detailBtn.textContent = "View";
+          detailBtn.setAttribute(
+            "aria-label",
+            `View details for task ${task.task_code}`
+          );
           detailBtn.addEventListener("click", async () => {
             listState.selectedCode = task.task_code;
             await loadTaskDetail(task.task_code);
@@ -199,7 +252,15 @@
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "button tertiary";
+            if (option.value === task.status) {
+              btn.classList.add("status-current");
+              btn.setAttribute("aria-current", "true");
+            }
             btn.textContent = option.label;
+            btn.setAttribute(
+              "aria-label",
+              `Set ${task.task_code} to ${option.label}`
+            );
             btn.addEventListener("click", async () => {
               btn.disabled = true;
               try {
@@ -213,7 +274,7 @@
                 );
                 if (!response.ok) {
                   const err = await response.json().catch(() => ({}));
-                  alert(err.error || "Status update failed");
+                  showToast(err.error || "Status update failed");
                   return;
                 }
                 await loadTasks({ reset: true });
@@ -221,7 +282,7 @@
                   await loadTaskDetail(task.task_code);
                 }
               } catch (error) {
-                alert(`Request failed: ${error}`);
+                showToast(`Request failed: ${error}`);
               } finally {
                 btn.disabled = false;
               }
@@ -294,37 +355,54 @@
       function renderTaskDetail(detail) {
         detailPlaceholder.hidden = true;
         detailBody.hidden = false;
-        detailBody.innerHTML = "";
+        detailBody.replaceChildren();
 
         const colA = document.createElement("div");
         const colB = document.createElement("div");
 
         const assignment = document.createElement("div");
         assignment.className = "detail-block";
-        assignment.innerHTML =
-          '<span class="detail-label">Assignment</span>' +
-          `<p class="detail-pre">${detail.assigned_team}: ${detail.assignment_reason || "—"}</p>`;
+        const alab = document.createElement("span");
+        alab.className = "detail-label";
+        alab.textContent = "Assignment";
+        const apre = document.createElement("p");
+        apre.className = "detail-pre";
+        apre.textContent = `${detail.assigned_team || "—"}: ${detail.assignment_reason || "—"}`;
+        assignment.appendChild(alab);
+        assignment.appendChild(apre);
         colA.appendChild(assignment);
 
         const risk = document.createElement("div");
         risk.className = "detail-block";
-        const reasons = Array.isArray(detail.risk_reasons)
-          ? detail.risk_reasons.map((r) => `• ${r}`).join("\n")
-          : "";
-        risk.innerHTML =
-          `<span class="detail-label">Risk (${detail.risk_score})</span>` +
-          `<pre class="detail-pre">${reasons || "—"}</pre>`;
+        const rlab = document.createElement("span");
+        rlab.className = "detail-label";
+        rlab.textContent = `Risk (${detail.risk_score ?? "—"})`;
+        const rpre = document.createElement("pre");
+        rpre.className = "detail-pre";
+        rpre.textContent = Array.isArray(detail.risk_reasons)
+          ? detail.risk_reasons.map((r) => `• ${r}`).join("\n") || "—"
+          : "—";
+        risk.appendChild(rlab);
+        risk.appendChild(rpre);
         colA.appendChild(risk);
 
         const request = document.createElement("div");
         request.className = "detail-block";
-        request.innerHTML =
-          '<span class="detail-label">Customer request</span>' +
-          `<pre class="detail-pre">${detail.customer_request_text || ""}</pre>`;
+        const qlab = document.createElement("span");
+        qlab.className = "detail-label";
+        qlab.textContent = "Customer request";
+        const qpre = document.createElement("pre");
+        qpre.className = "detail-pre";
+        qpre.textContent = detail.customer_request_text || "";
+        request.appendChild(qlab);
+        request.appendChild(qpre);
         colB.appendChild(request);
 
         const steps = document.createElement("div");
         steps.className = "detail-block";
+        const slab = document.createElement("span");
+        slab.className = "detail-label";
+        slab.textContent = "Workflow steps";
         const ol = document.createElement("ol");
         ol.className = "detail-list";
         (detail.steps || []).forEach((row) => {
@@ -332,10 +410,8 @@
           li.textContent = row.description;
           ol.appendChild(li);
         });
-        const stepsWrap = document.createElement("div");
-        stepsWrap.innerHTML = '<span class="detail-label">Workflow steps</span>';
-        stepsWrap.appendChild(ol);
-        steps.appendChild(stepsWrap);
+        steps.appendChild(slab);
+        steps.appendChild(ol);
         colB.appendChild(steps);
 
         detailBody.appendChild(colA);
@@ -344,14 +420,20 @@
         const messages = document.createElement("div");
         messages.style.gridColumn = "1 / -1";
         messages.className = "detail-block";
-        messages.innerHTML = '<span class="detail-label">Outbound messages (WhatsApp, email, SMS)</span>';
+        const mhead = document.createElement("span");
+        mhead.className = "detail-label";
+        mhead.textContent = "Outbound messages (WhatsApp, email, SMS)";
+        messages.appendChild(mhead);
         (detail.messages || []).forEach((m) => {
           const sub = document.createElement("div");
-          sub.style.marginTop = "10px";
-          sub.innerHTML = `<span class="detail-label">${m.channel}</span>`;
+          sub.className = "detail-message-block";
+          const ch = document.createElement("span");
+          ch.className = "detail-label";
+          ch.textContent = m.channel;
           const pre = document.createElement("pre");
           pre.className = "detail-pre";
           pre.textContent = m.content;
+          sub.appendChild(ch);
           sub.appendChild(pre);
           messages.appendChild(sub);
         });
@@ -389,6 +471,8 @@
           return;
         }
 
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
         resultBox.textContent = "Creating task...";
         try {
           const response = await fetch("/api/tasks/create/", {
@@ -397,19 +481,35 @@
             body: JSON.stringify({ request_text: requestText }),
           });
           const data = await response.json();
+          if (!response.ok) {
+            resultBox.textContent = data.error || "Task creation failed.";
+            showToast(data.error || "Could not create task.");
+            return;
+          }
           resultBox.textContent = JSON.stringify(data, null, 2);
           await loadTasks({ reset: true });
           if (data.task_code) {
             listState.selectedCode = data.task_code;
             await loadTaskDetail(data.task_code);
           }
+          showToast(`Task ${data.task_code} created.`);
         } catch (error) {
           resultBox.textContent = `Request failed: ${error}`;
+          showToast(`Request failed: ${error}`);
+        } finally {
+          if (submitBtn) submitBtn.disabled = false;
         }
       });
 
       refreshButton.addEventListener("click", async () => {
         await loadTasks({ reset: true });
+      });
+
+      document.querySelectorAll(".example-chip").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          requestInput.value = chip.textContent.trim();
+          requestInput.focus();
+        });
       });
 
       loadTasks({ reset: true });
