@@ -93,6 +93,12 @@ Invoke-RestMethod -Method Post `
   - `assigned_team`
   - `assignment_reason`
 
+## Task dashboard + status updates (Step 8)
+- Home page dashboard lists recent tasks (code, intent, status, risk, team, created time).
+- Each row has **Pending**, **In progress**, and **Completed** actions; each click calls:
+  - `POST /api/tasks/<task_code>/status/` with body `{ "status": "PENDING" | "IN_PROGRESS" | "COMPLETED" }`
+- Updates persist immediately on `Task` and append a row to `TaskStatusHistory` when the status actually changes.
+
 ## Project status
 - Step 1 complete: runnable skeleton + homepage UI scaffold.
 - Step 2 complete: persistence schema + admin visibility for tasks and related objects.
@@ -100,7 +106,8 @@ Invoke-RestMethod -Method Post `
 - Step 4 complete: deterministic diaspora-aware risk scoring engine and API output.
 - Step 5 complete: task creation pipeline + API dashboard listing.
 - Step 6 complete: step generation + three-format message persistence.
-- Step 7 in progress: explicit employee assignment routing and rationale exposure.
+- Step 7 complete: explicit employee assignment routing and rationale exposure.
+- Step 8 complete: dashboard UI + immediate status updates with history.
 
 ## Decisions I made and why (to be completed)
 - Which AI tools I used and where

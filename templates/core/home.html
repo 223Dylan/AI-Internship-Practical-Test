@@ -29,7 +29,7 @@
 
           <div class="row">
             <button type="submit" class="button">Create Task</button>
-            <span class="hint">Step 6: creates task, steps, and channel-specific messages</span>
+            <span class="hint">Step 8: dashboard supports live status updates</span>
           </div>
         </form>
       </section>
@@ -44,7 +44,12 @@
           <h2 class="result-title">Saved tasks dashboard</h2>
           <button id="refresh-tasks" type="button" class="button secondary">Refresh</button>
         </div>
-        <pre id="tasks-result" class="result-box">No tasks loaded yet.</pre>
+        <p class="dashboard-hint">
+          Update status with the buttons below; each change is saved immediately and recorded in status history.
+        </p>
+        <div id="dashboard-root" class="dashboard-root">
+          <p class="muted-inline">Loading tasks…</p>
+        </div>
       </section>
 
       <section class="examples">
@@ -59,20 +64,126 @@
     <script>
       const form = document.getElementById("intent-form");
       const resultBox = document.getElementById("result");
-      const tasksResult = document.getElementById("tasks-result");
+      const dashboardRoot = document.getElementById("dashboard-root");
       const refreshButton = document.getElementById("refresh-tasks");
       const requestInput = document.getElementById("request_text");
 
+      const STATUS_OPTIONS = [
+        { value: "PENDING", label: "Pending" },
+        { value: "IN_PROGRESS", label: "In progress" },
+        { value: "COMPLETED", label: "Completed" },
+      ];
+
+      function formatStatus(value) {
+        const found = STATUS_OPTIONS.find((item) => item.value === value);
+        return found ? found.label : value;
+      }
+
+      function renderDashboard(data) {
+        dashboardRoot.innerHTML = "";
+        if (!data.tasks || data.tasks.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "muted-inline";
+          empty.textContent = "No tasks yet. Create one above.";
+          dashboardRoot.appendChild(empty);
+          return;
+        }
+
+        const table = document.createElement("table");
+        table.className = "task-table";
+
+        const thead = document.createElement("thead");
+        const headRow = document.createElement("tr");
+        ["Code", "Intent", "Status", "Risk", "Team", "Created", "Actions"].forEach((text) => {
+          const th = document.createElement("th");
+          th.textContent = text;
+          headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        data.tasks.forEach((task) => {
+          const tr = document.createElement("tr");
+
+          const codeTd = document.createElement("td");
+          codeTd.textContent = task.task_code;
+          tr.appendChild(codeTd);
+
+          const intentTd = document.createElement("td");
+          intentTd.textContent = task.intent;
+          tr.appendChild(intentTd);
+
+          const statusTd = document.createElement("td");
+          statusTd.textContent = formatStatus(task.status);
+          tr.appendChild(statusTd);
+
+          const riskTd = document.createElement("td");
+          riskTd.textContent = String(task.risk_score);
+          tr.appendChild(riskTd);
+
+          const teamTd = document.createElement("td");
+          teamTd.textContent = task.assigned_team;
+          tr.appendChild(teamTd);
+
+          const createdTd = document.createElement("td");
+          createdTd.textContent = task.created_at;
+          tr.appendChild(createdTd);
+
+          const actionsTd = document.createElement("td");
+          actionsTd.className = "actions-cell";
+          STATUS_OPTIONS.forEach((option) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "button tertiary";
+            btn.textContent = option.label;
+            btn.addEventListener("click", async () => {
+              btn.disabled = true;
+              try {
+                const response = await fetch(
+                  `/api/tasks/${encodeURIComponent(task.task_code)}/status/`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: option.value }),
+                  }
+                );
+                if (!response.ok) {
+                  const err = await response.json().catch(() => ({}));
+                  alert(err.error || "Status update failed");
+                  return;
+                }
+                await loadTasks();
+              } catch (error) {
+                alert(`Request failed: ${error}`);
+              } finally {
+                btn.disabled = false;
+              }
+            });
+            actionsTd.appendChild(btn);
+          });
+          tr.appendChild(actionsTd);
+
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        dashboardRoot.appendChild(table);
+      }
+
       async function loadTasks() {
-        tasksResult.textContent = "Loading tasks...";
+        dashboardRoot.innerHTML = '<p class="muted-inline">Loading tasks…</p>';
         try {
           const response = await fetch("/api/tasks/?limit=20", {
             method: "GET",
           });
           const data = await response.json();
-          tasksResult.textContent = JSON.stringify(data, null, 2);
+          if (!response.ok) {
+            dashboardRoot.textContent = data.error || "Failed to load tasks.";
+            return;
+          }
+          renderDashboard(data);
         } catch (error) {
-          tasksResult.textContent = `Task load failed: ${error}`;
+          dashboardRoot.textContent = `Task load failed: ${error}`;
         }
       }
 

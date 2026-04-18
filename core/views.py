@@ -1,11 +1,12 @@
 import json
 
+from django.db import transaction
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from .models import Task
+from .models import Task, TaskStatus, TaskStatusHistory
 from .services.intent_extractor import extract_intent_and_entities
 from .services.risk_scorer import assess_risk
 from .services.task_creator import create_task_from_request
@@ -130,3 +131,64 @@ def list_tasks(request):
         )
 
     return JsonResponse({"count": len(tasks), "tasks": tasks})
+
+
+ALLOWED_STATUS_VALUES = {
+    TaskStatus.PENDING,
+    TaskStatus.IN_PROGRESS,
+    TaskStatus.COMPLETED,
+}
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def update_task_status(request, task_code: str):
+    payload = {}
+    if request.content_type and "application/json" in request.content_type:
+        try:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON payload."}, status=400)
+    else:
+        payload = request.POST.dict()
+
+    new_status = str(payload.get("status", "")).strip().upper()
+    if new_status not in ALLOWED_STATUS_VALUES:
+        return JsonResponse(
+            {
+                "error": "status must be one of: PENDING, IN_PROGRESS, COMPLETED.",
+            },
+            status=400,
+        )
+
+    task = get_object_or_404(Task, code=task_code)
+    with transaction.atomic():
+        task_locked = Task.objects.select_for_update().get(pk=task.pk)
+        from_status = task_locked.status
+        if from_status == new_status:
+            return JsonResponse(
+                {
+                    "task_code": task_locked.code,
+                    "status": task_locked.status,
+                    "changed": False,
+                    "updated_at": task_locked.updated_at.isoformat(),
+                }
+            )
+        task_locked.status = new_status
+        task_locked.save(update_fields=["status", "updated_at"])
+        TaskStatusHistory.objects.create(
+            task=task_locked,
+            from_status=from_status,
+            to_status=new_status,
+        )
+
+    task_locked.refresh_from_db()
+    return JsonResponse(
+        {
+            "task_code": task_locked.code,
+            "status": task_locked.status,
+            "changed": True,
+            "from_status": from_status,
+            "updated_at": task_locked.updated_at.isoformat(),
+        }
+    )

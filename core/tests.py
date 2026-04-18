@@ -102,6 +102,51 @@ class IntentExtractionApiTests(TestCase):
         response = self.client.get("/api/tasks/?limit=bad")
         self.assertEqual(response.status_code, 400)
 
+    def test_update_task_status_persists_and_records_history(self):
+        create = self.client.post(
+            "/api/tasks/create/",
+            data=json.dumps({"request_text": "Can someone clean my apartment in Westlands?"}),
+            content_type="application/json",
+        )
+        self.assertEqual(create.status_code, 201)
+        code = create.json()["task_code"]
+        task = Task.objects.get(code=code)
+        before_history = TaskStatusHistory.objects.filter(task=task).count()
+
+        response = self.client.post(
+            f"/api/tasks/{code}/status/",
+            data=json.dumps({"status": "IN_PROGRESS"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["changed"])
+        task.refresh_from_db()
+        self.assertEqual(task.status, "IN_PROGRESS")
+        self.assertGreater(TaskStatusHistory.objects.filter(task=task).count(), before_history)
+
+    def test_update_task_status_rejects_invalid_value(self):
+        create = self.client.post(
+            "/api/tasks/create/",
+            data=json.dumps({"request_text": "Please verify my land title deed for Karen."}),
+            content_type="application/json",
+        )
+        code = create.json()["task_code"]
+        response = self.client.post(
+            f"/api/tasks/{code}/status/",
+            data=json.dumps({"status": "INVALID"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_update_task_status_returns_404_for_unknown_code(self):
+        response = self.client.post(
+            "/api/tasks/VNH-UNKNOWN-CODE99/status/",
+            data=json.dumps({"status": "COMPLETED"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 404)
+
     def test_create_task_api_persists_three_message_formats(self):
         response = self.client.post(
             "/api/tasks/create/",
